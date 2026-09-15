@@ -143,8 +143,10 @@ Queued → Converting → Splitting → Validating → Completed
 
 ## What I’d do with more time
 
+See the full backlog in [`docs/FUTURE_SUGGESTIONS.md`](./docs/FUTURE_SUGGESTIONS.md). Highlights:
+
 - Background worker / queue for large files  
-- Additional converters (e.g. PDF → DOCX) via Open/Closed principle  
+- PDF export exporter (same HTML-first pipeline)  
 - Content hashing to strengthen validation  
 - AuthN/AuthZ and stronger audit trail  
 - EF migrations instead of `EnsureCreated`  

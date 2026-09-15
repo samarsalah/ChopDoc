@@ -58,8 +58,30 @@ public class MarkedDocumentSplitterTests
     }
 
     [Fact]
+    public void SplitIfNeeded_WhenPageExceedsLimit_SplitsIntoHtmlAtoms()
+    {
+        var blockA = new string('A', 900);
+        var blockB = new string('B', 900);
+        var section =
+            $"<section data-chopdoc-marker=\"page-1\"><h2>Page 1</h2><p>{blockA}</p><p>{blockB}</p></section>";
+        var content = Encoding.UTF8.GetBytes(Wrap(section));
+
+        var oneAtomWrapped = Encoding.UTF8.GetByteCount(
+            Wrap($"<section data-chopdoc-marker=\"page-1#1\"><p>{blockA}</p></section>"));
+        var limit = oneAtomWrapped + 80;
+        Assert.True(content.LongLength > limit);
+
+        var parts = _sut.SplitIfNeeded(content, "doc", ".html", limit);
+
+        Assert.True(parts.Count >= 2);
+        Assert.All(parts, p => Assert.True(p.Content.LongLength <= limit));
+        Assert.Contains("page-1#", string.Join(';', parts.Select(p => p.ContentMarker)));
+    }
+
+    [Fact]
     public void SplitIfNeeded_WhenSingleSectionExceedsLimit_ThrowsUnsplittable()
     {
+        // One atomic <p> larger than the limit cannot be split further.
         var huge = ("page-1", new string('X', 5000));
         var content = Encoding.UTF8.GetBytes(BuildHtml(huge));
         var limit = 500;

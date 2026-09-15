@@ -8,4 +8,5 @@
 | [TESTING.md](./TESTING.md) | Automated + manual test plan |
 | [REQUIREMENTS_TRACEABILITY.md](./REQUIREMENTS_TRACEABILITY.md) | Assessment checklist mapping |
 | [DECISIONS.md](./DECISIONS.md) | Key trade-offs |
+| [FUTURE_SUGGESTIONS.md](./FUTURE_SUGGESTIONS.md) | Backlog / “with more time” ideas |
 | [INTERVIEW_NOTES.md](./INTERVIEW_NOTES.md) | Live-demo talking points |

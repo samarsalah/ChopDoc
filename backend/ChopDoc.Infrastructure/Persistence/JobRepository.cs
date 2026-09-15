@@ -35,7 +35,62 @@ public sealed class JobRepository : IJobRepository
 
     public async Task UpdateAsync(DocumentJob job, CancellationToken cancellationToken = default)
     {
-        _db.Jobs.Update(job);
+        var existingHistoryIds = await _db.Set<JobHistoryEntry>()
+            .AsNoTracking()
+            .Where(h => h.JobId == job.Id)
+            .Select(h => h.Id)
+            .ToListAsync(cancellationToken);
+
+        var existingPartIds = await _db.Set<DocumentPart>()
+            .AsNoTracking()
+            .Where(p => p.JobId == job.Id)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        if (_db.Entry(job).State == EntityState.Detached)
+            _db.Jobs.Attach(job);
+
+        // Mark scalar job fields dirty (status, errors, timestamps).
+        var jobEntry = _db.Entry(job);
+        jobEntry.Property(j => j.Status).IsModified = true;
+        jobEntry.Property(j => j.ErrorCode).IsModified = true;
+        jobEntry.Property(j => j.ErrorMessage).IsModified = true;
+        jobEntry.Property(j => j.UpdatedAtUtc).IsModified = true;
+        jobEntry.Property(j => j.CompletedAtUtc).IsModified = true;
+
+        foreach (var history in job.History)
+        {
+            if (existingHistoryIds.Contains(history.Id))
+                continue;
+
+            // Force INSERT for new history — never UPDATE (avoids concurrency 0-row errors).
+            var historyEntry = _db.Entry(history);
+            if (historyEntry.State == EntityState.Detached)
+                _db.Set<JobHistoryEntry>().Add(history);
+            else
+                historyEntry.State = EntityState.Added;
+        }
+
+        var currentPartIds = job.Parts.Select(p => p.Id).ToHashSet();
+        foreach (var oldPartId in existingPartIds.Where(id => !currentPartIds.Contains(id)))
+        {
+            var oldPart = await _db.Set<DocumentPart>().FindAsync(new object[] { oldPartId }, cancellationToken);
+            if (oldPart is not null)
+                _db.Set<DocumentPart>().Remove(oldPart);
+        }
+
+        foreach (var part in job.Parts)
+        {
+            if (existingPartIds.Contains(part.Id))
+                continue;
+
+            var partEntry = _db.Entry(part);
+            if (partEntry.State == EntityState.Detached)
+                _db.Set<DocumentPart>().Add(part);
+            else
+                partEntry.State = EntityState.Added;
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
     }
 }

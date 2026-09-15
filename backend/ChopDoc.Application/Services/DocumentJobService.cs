@@ -126,16 +126,13 @@ public sealed class DocumentJobService : IDocumentJobService
     {
         try
         {
-            // 1) PDF → HTML (canonical intermediate)
+            // Keep status/history in memory; one SaveChanges at the end avoids EF graph churn.
             job.MarkConverting();
-            await _jobs.UpdateAsync(job, cancellationToken);
 
             await using var source = await _files.OpenReadAsync(job.StoredSourcePath, cancellationToken);
             var html = await _converter.ConvertPdfToHtmlAsync(source, cancellationToken);
 
-            // 2) Split/validate on HTML so constraints stay format-agnostic
             job.MarkSplitting();
-            await _jobs.UpdateAsync(job, cancellationToken);
 
             var baseName = Path.GetFileNameWithoutExtension(job.OriginalFileName);
             var htmlParts = _splitter.SplitIfNeeded(
@@ -145,7 +142,6 @@ public sealed class DocumentJobService : IDocumentJobService
                 job.SizeLimitBytes);
 
             job.MarkValidating();
-            await _jobs.UpdateAsync(job, cancellationToken);
 
             var validation = _validator.Validate(htmlParts, job.SizeLimitBytes);
             if (!validation.IsValid)
@@ -155,7 +151,6 @@ public sealed class DocumentJobService : IDocumentJobService
                 return;
             }
 
-            // 3) Export each validated HTML part to the requested output format
             var persistedParts = new List<DocumentPart>();
             foreach (var part in htmlParts)
             {

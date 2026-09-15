@@ -1,41 +1,75 @@
 <section class="panel submit-panel">
   <h2>New conversion job</h2>
-  <p class="hint">Upload a PDF, choose an output format, optionally override the size limit (default 2 MB). Pipeline: PDF → HTML → split/validate → export. Supported exports: HTML, Plain Text, Markdown, DOCX.</p>
+  <p class="hint">
+    Upload a PDF, choose an output format, optionally override the size limit (default 2 MB).
+  </p>
 
   <form class="submit-form" (ngSubmit)="submit()">
-    <label>
+    <label class="field-file">
       <span>Source PDF</span>
-      <input type="file" accept=".pdf,application/pdf" (change)="onFileSelected($event)" />
+      <input
+        #fileInput
+        type="file"
+        accept=".pdf,application/pdf"
+        (change)="onFileSelected($event)" />
+      <small class="file-name" *ngIf="selectedFile">{{ selectedFile.name }}</small>
     </label>
 
-    <label>
-      <span>Output format</span>
-      <select [(ngModel)]="outputFormat" name="outputFormat">
-        <option value="Html">HTML (supported)</option>
-        <option value="PlainText">Plain Text (supported)</option>
-        <option value="Markdown">Markdown (supported)</option>
-        <option value="Docx">DOCX (supported)</option>
-        <option value="Rtf">RTF</option>
-        <option value="Xml">XML</option>
-        <option value="Json">JSON</option>
-        <option value="Csv">CSV</option>
-        <option value="Epub">EPUB</option>
-        <option value="Odt">ODT</option>
-      </select>
-    </label>
+    <div class="field-row">
+      <label class="field">
+        <span>Output format</span>
+        <select [(ngModel)]="outputFormat" name="outputFormat">
+          <option *ngFor="let fmt of outputFormats" [value]="fmt.value">{{ fmt.label }}</option>
+        </select>
+      </label>
 
-    <label>
-      <span>Size limit (MB)</span>
-      <input type="number" min="0.01" step="0.1" [(ngModel)]="sizeLimitMb" name="sizeLimitMb" />
-    </label>
+      <label class="field">
+        <span>Size limit (MB)</span>
+        <input type="number" min="0.01" step="0.1" [(ngModel)]="sizeLimitMb" name="sizeLimitMb" />
+      </label>
 
-    <button type="submit" [disabled]="submitting">
-      {{ submitting ? 'Processing…' : 'Submit job' }}
-    </button>
+      <button type="submit" [disabled]="submitting">
+        {{ submitting ? 'Processing…' : 'Submit job' }}
+      </button>
+    </div>
   </form>
 
   <p class="message error" *ngIf="errorMessage">{{ errorMessage }}</p>
   <p class="message ok" *ngIf="successMessage">{{ successMessage }}</p>
+</section>
+
+<section class="panel pipeline-panel">
+  <h2>How a job runs</h2>
+  <p class="hint">
+    Every submit runs this pipeline on the server. Select a job below to see which steps it completed.
+  </p>
+
+  <ol class="pipeline">
+    <li
+      *ngFor="let step of pipelineSteps; let i = index; let last = last"
+      [class.done]="stepState(step.key) === 'done'"
+      [class.current]="stepState(step.key) === 'current'"
+      [class.todo]="stepState(step.key) === 'todo'"
+      [class.failed]="stepState(step.key) === 'failed'"
+      [class.review]="stepState(step.key) === 'review'">
+      <div class="pipeline-node">
+        <span class="pipeline-index">{{ i + 1 }}</span>
+        <div>
+          <strong>{{ step.label }}</strong>
+          <small>{{ step.hint }}</small>
+        </div>
+      </div>
+      <span class="pipeline-arrow" *ngIf="!last" aria-hidden="true">→</span>
+    </li>
+  </ol>
+
+  <p class="pipeline-note" *ngIf="submitting">Running now: convert → split → validate → export…</p>
+  <p class="pipeline-note" *ngIf="!submitting && selected">
+    Selected job ended as <strong>{{ selected.status }}</strong>
+    <ng-container *ngIf="selected.status === 'NeedsReview' || selected.status === 'Failed'">
+      — see history for the reason.
+    </ng-container>
+  </p>
 </section>
 
 <section class="layout">
@@ -108,7 +142,7 @@
         <p class="hint">No downloadable parts for this job.</p>
       </ng-template>
 
-      <h3>History</h3>
+      <h3>History timeline</h3>
       <ol class="history">
         <li *ngFor="let entry of job.history">
           <span [class]="statusClass(entry.status)">{{ entry.status }}</span>

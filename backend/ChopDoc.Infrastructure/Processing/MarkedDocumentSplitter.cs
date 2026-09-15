@@ -7,7 +7,7 @@ using ChopDoc.Domain.Models;
 namespace ChopDoc.Infrastructure.Processing;
 
 /// <summary>
-/// Splits converted content by page markers (HTML sections or ===CHOPDOC:marker=== blocks).
+/// Splits converted content by page markers, then by smaller HTML atoms when a page exceeds the limit.
 /// </summary>
 public sealed class MarkedDocumentSplitter : IDocumentSplitter
 {
@@ -18,6 +18,11 @@ public sealed class MarkedDocumentSplitter : IDocumentSplitter
     private static readonly Regex TextSectionRegex = new(
         @"===CHOPDOC:(?<marker>[^=\r\n]+)===\r?\n(?<body>[\s\S]*?)(?======CHOPDOC:|\z)",
         RegexOptions.Compiled);
+
+    /// <summary>Headings, paragraphs, and images as atomic split units.</summary>
+    private static readonly Regex HtmlAtomRegex = new(
+        @"<img\b[^>]*>|<(?<tag>h1|h2|h3|p)\b[^>]*>[\s\S]*?</\k<tag>>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public IReadOnlyList<SplitPartContent> SplitIfNeeded(
         byte[] convertedContent,
@@ -59,6 +64,9 @@ public sealed class MarkedDocumentSplitter : IDocumentSplitter
             throw new UnsplittableContentException(
                 $"Converted output is {convertedContent.LongLength} bytes and has no splittable page sections.");
         }
+
+        if (isHtml)
+            units = ExpandOversizedHtmlUnits(units, sizeLimitBytes);
 
         foreach (var unit in units)
         {
@@ -104,6 +112,46 @@ public sealed class MarkedDocumentSplitter : IDocumentSplitter
         foreach (Match match in HtmlSectionRegex.Matches(html))
             units.Add(new ContentUnit(match.Groups["marker"].Value, match.Value));
         return units;
+    }
+
+    private static List<ContentUnit> ExpandOversizedHtmlUnits(
+        IReadOnlyList<ContentUnit> units,
+        long sizeLimitBytes)
+    {
+        var expanded = new List<ContentUnit>();
+
+        foreach (var unit in units)
+        {
+            var unitBytes = Encoding.UTF8.GetByteCount(WrapHtml(unit.Content));
+            if (unitBytes <= sizeLimitBytes)
+            {
+                expanded.Add(unit);
+                continue;
+            }
+
+            var bodyMatch = HtmlSectionRegex.Match(unit.Content);
+            var body = bodyMatch.Success ? bodyMatch.Groups["body"].Value : unit.Content;
+            var atoms = HtmlAtomRegex.Matches(body);
+
+            if (atoms.Count == 0)
+            {
+                // Cannot break further — keep as-is; caller will raise unsplittable if still over limit.
+                expanded.Add(unit);
+                continue;
+            }
+
+            var index = 1;
+            foreach (Match atom in atoms)
+            {
+                var marker = $"{unit.Marker}#{index}";
+                var section =
+                    $"<section data-chopdoc-marker=\"{marker}\">{atom.Value}</section>";
+                expanded.Add(new ContentUnit(marker, section));
+                index++;
+            }
+        }
+
+        return expanded;
     }
 
     private static List<ContentUnit> ExtractTextUnits(string text)

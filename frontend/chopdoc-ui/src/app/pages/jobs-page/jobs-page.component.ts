@@ -1,8 +1,14 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { JobService } from '../../services/job.service';
 import { JobDetail, JobSummary } from '../../models/job.models';
+
+interface PipelineStep {
+  key: string;
+  label: string;
+  hint: string;
+}
 
 @Component({
   selector: 'app-jobs-page',
@@ -12,12 +18,30 @@ import { JobDetail, JobSummary } from '../../models/job.models';
   styleUrl: './jobs-page.component.scss'
 })
 export class JobsPageComponent implements OnInit {
+  @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
+
   jobs: JobSummary[] = [];
   selected: JobDetail | null = null;
 
   selectedFile: File | null = null;
   outputFormat = 'Html';
   sizeLimitMb: number | null = 2;
+
+  readonly outputFormats = [
+    { value: 'Html', label: 'HTML' },
+    { value: 'PlainText', label: 'Plain Text' },
+    { value: 'Markdown', label: 'Markdown' },
+    { value: 'Docx', label: 'DOCX' }
+  ];
+
+  /** Stages the backend runs for every job (shown in the UI pipeline). */
+  readonly pipelineSteps: PipelineStep[] = [
+    { key: 'Queued', label: 'Queued', hint: 'Job accepted and saved' },
+    { key: 'Converting', label: 'Convert', hint: 'PDF → HTML intermediate' },
+    { key: 'Splitting', label: 'Split', hint: 'Break oversize output into parts' },
+    { key: 'Validating', label: 'Validate', hint: 'Check parts are complete' },
+    { key: 'Completed', label: 'Export', hint: 'Write HTML / Text / Markdown / DOCX' }
+  ];
 
   submitting = false;
   loadingList = false;
@@ -34,6 +58,14 @@ export class JobsPageComponent implements OnInit {
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.selectedFile = input.files?.[0] ?? null;
+    this.errorMessage = '';
+  }
+
+  clearFileInput(): void {
+    this.selectedFile = null;
+    if (this.fileInput?.nativeElement) {
+      this.fileInput.nativeElement.value = '';
+    }
   }
 
   submit(): void {
@@ -51,7 +83,7 @@ export class JobsPageComponent implements OnInit {
         this.submitting = false;
         this.successMessage = `Job ${detail.status}: ${detail.originalFileName}`;
         this.selected = detail;
-        this.selectedFile = null;
+        this.clearFileInput();
         this.refreshList();
       },
       error: err => {
@@ -93,6 +125,29 @@ export class JobsPageComponent implements OnInit {
   downloadPart(partId: string): void {
     if (!this.selected) return;
     window.open(this.jobService.partDownloadUrl(this.selected.id, partId), '_blank');
+  }
+
+  /** Visual state for a pipeline step based on the selected job's history. */
+  stepState(stepKey: string): 'done' | 'current' | 'todo' | 'failed' | 'review' {
+    if (this.submitting) {
+      return stepKey === 'Converting' || stepKey === 'Queued' ? 'current' : 'todo';
+    }
+
+    if (!this.selected) return 'todo';
+
+    const seen = new Set(this.selected.history.map(h => h.status));
+    const status = this.selected.status;
+
+    if (stepKey === 'Completed') {
+      if (status === 'Completed') return 'done';
+      if (status === 'Failed') return 'failed';
+      if (status === 'NeedsReview') return 'review';
+      return 'todo';
+    }
+
+    if (seen.has(stepKey)) return 'done';
+    if (status === stepKey) return 'current';
+    return 'todo';
   }
 
   statusClass(status: string): string {
