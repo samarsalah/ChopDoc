@@ -5,9 +5,9 @@ using ChopDoc.Infrastructure.Processing;
 
 namespace ChopDoc.Tests;
 
-public class HtmlDocumentSplitterTests
+public class MarkedDocumentSplitterTests
 {
-    private readonly HtmlDocumentSplitter _sut = new();
+    private readonly MarkedDocumentSplitter _sut = new();
 
     [Fact]
     public void SplitIfNeeded_WhenUnderLimit_ReturnsSinglePart()

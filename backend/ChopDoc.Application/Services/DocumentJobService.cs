@@ -16,6 +16,7 @@ public sealed class DocumentJobService : IDocumentJobService
     private readonly IDocumentConverter _converter;
     private readonly IDocumentSplitter _splitter;
     private readonly IOutputValidator _validator;
+    private readonly IOutputExporter _exporter;
     private readonly DocumentProcessingOptions _options;
 
     public DocumentJobService(
@@ -24,6 +25,7 @@ public sealed class DocumentJobService : IDocumentJobService
         IDocumentConverter converter,
         IDocumentSplitter splitter,
         IOutputValidator validator,
+        IOutputExporter exporter,
         IOptions<DocumentProcessingOptions> options)
     {
         _jobs = jobs;
@@ -31,6 +33,7 @@ public sealed class DocumentJobService : IDocumentJobService
         _converter = converter;
         _splitter = splitter;
         _validator = validator;
+        _exporter = exporter;
         _options = options.Value;
     }
 
@@ -52,7 +55,6 @@ public sealed class DocumentJobService : IDocumentJobService
             $"{Guid.NewGuid():N}_{safeFileName}",
             cancellationToken);
 
-        // Persist every request (assessment 4.6), including intake failures.
         var job = new DocumentJob(safeFileName, sourcePath, outputFormat, sizeLimitBytes);
         await _jobs.AddAsync(job, cancellationToken);
 
@@ -64,9 +66,9 @@ public sealed class DocumentJobService : IDocumentJobService
             return await GetRequiredDetailAsync(job.Id, cancellationToken);
         }
 
-        if (!parsedFormat || outputFormat == OutputFormat.Unspecified)
+        if (!parsedFormat || outputFormat == OutputFormat.Unspecified || !_exporter.Supports(outputFormat))
         {
-            job.MarkFailed(new UnsupportedOutputFormatException(request.OutputFormat ?? "(null)"));
+            job.MarkFailed(new UnsupportedOutputFormatException(request.OutputFormat ?? outputFormat.ToString()));
             await _jobs.UpdateAsync(job, cancellationToken);
             return await GetRequiredDetailAsync(job.Id, cancellationToken);
         }
@@ -101,37 +103,51 @@ public sealed class DocumentJobService : IDocumentJobService
             return null;
 
         var stream = await _files.OpenReadAsync(part.StoredPath, cancellationToken);
-        var contentType = part.FileName.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
-            ? "text/html"
-            : "application/octet-stream";
+        return (stream, part.FileName, GuessContentType(part.FileName));
+    }
 
-        return (stream, part.FileName, contentType);
+    private static string GuessContentType(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".html" or ".htm" => "text/html",
+            ".md" => "text/markdown",
+            ".txt" => "text/plain",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xml" => "application/xml",
+            ".json" => "application/json",
+            ".csv" => "text/csv",
+            _ => "application/octet-stream"
+        };
     }
 
     private async Task ProcessPipelineAsync(DocumentJob job, CancellationToken cancellationToken)
     {
         try
         {
+            // 1) PDF → HTML (canonical intermediate)
             job.MarkConverting();
             await _jobs.UpdateAsync(job, cancellationToken);
 
             await using var source = await _files.OpenReadAsync(job.StoredSourcePath, cancellationToken);
-            var conversion = await _converter.ConvertAsync(source, job.RequestedOutputFormat, cancellationToken);
+            var html = await _converter.ConvertPdfToHtmlAsync(source, cancellationToken);
 
+            // 2) Split/validate on HTML so constraints stay format-agnostic
             job.MarkSplitting();
             await _jobs.UpdateAsync(job, cancellationToken);
 
             var baseName = Path.GetFileNameWithoutExtension(job.OriginalFileName);
-            var splitParts = _splitter.SplitIfNeeded(
-                conversion.Content,
+            var htmlParts = _splitter.SplitIfNeeded(
+                html.Content,
                 baseName,
-                conversion.FileExtension,
+                ".html",
                 job.SizeLimitBytes);
 
             job.MarkValidating();
             await _jobs.UpdateAsync(job, cancellationToken);
 
-            var validation = _validator.Validate(splitParts, job.SizeLimitBytes);
+            var validation = _validator.Validate(htmlParts, job.SizeLimitBytes);
             if (!validation.IsValid)
             {
                 job.MarkNeedsReview(new OutputValidationException(validation.FailureReason ?? "Unknown validation failure."));
@@ -139,13 +155,21 @@ public sealed class DocumentJobService : IDocumentJobService
                 return;
             }
 
+            // 3) Export each validated HTML part to the requested output format
             var persistedParts = new List<DocumentPart>();
-            foreach (var part in splitParts)
+            foreach (var part in htmlParts)
             {
-                var path = await _files.SaveAsync(
+                var exported = _exporter.Export(
                     part.Content,
+                    baseName,
+                    part.PartNumber,
+                    part.TotalParts,
+                    job.RequestedOutputFormat);
+
+                var path = await _files.SaveAsync(
+                    exported.Content,
                     $"jobs/{job.Id:N}/parts",
-                    part.FileName,
+                    exported.FileName,
                     cancellationToken);
 
                 persistedParts.Add(new DocumentPart(
@@ -153,8 +177,8 @@ public sealed class DocumentJobService : IDocumentJobService
                     part.PartNumber,
                     part.TotalParts,
                     path,
-                    part.Content.LongLength,
-                    part.FileName));
+                    exported.Content.LongLength,
+                    exported.FileName));
             }
 
             job.ReplaceParts(persistedParts);

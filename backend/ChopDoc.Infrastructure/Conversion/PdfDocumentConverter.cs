@@ -10,21 +10,16 @@ using UglyToad.PdfPig.Content;
 namespace ChopDoc.Infrastructure.Conversion;
 
 /// <summary>
-/// Rule-based PDF → HTML conversion (no OCR).
-/// Embeds page markers so splitting/validation can track content units.
+/// Rule-based PDF → HTML (canonical intermediate). No OCR.
 /// </summary>
-public sealed class PdfToHtmlConverter : IDocumentConverter
+public sealed class PdfDocumentConverter : IDocumentConverter
 {
-    public const string MarkerAttribute = "data-chopdoc-marker";
+    public const string HtmlMarkerAttribute = "data-chopdoc-marker";
 
-    public Task<ConversionResult> ConvertAsync(
+    public Task<ConversionResult> ConvertPdfToHtmlAsync(
         Stream sourcePdf,
-        OutputFormat outputFormat,
         CancellationToken cancellationToken = default)
     {
-        if (outputFormat != OutputFormat.Html)
-            throw new UnsupportedOutputFormatException(outputFormat.ToString());
-
         try
         {
             using var document = PdfDocument.Open(sourcePdf);
@@ -38,10 +33,8 @@ public sealed class PdfToHtmlConverter : IDocumentConverter
                 throw new ScannedDocumentException();
 
             var html = BuildHtml(pages);
-            var bytes = Encoding.UTF8.GetBytes(html);
-
             return Task.FromResult(new ConversionResult(
-                bytes,
+                Encoding.UTF8.GetBytes(html),
                 "text/html; charset=utf-8",
                 ".html",
                 OutputFormat.Html,
@@ -73,7 +66,7 @@ public sealed class PdfToHtmlConverter : IDocumentConverter
         {
             var page = pages[i];
             var marker = $"page-{i + 1}";
-            sb.AppendLine($"  <section {MarkerAttribute}=\"{marker}\">");
+            sb.AppendLine($"  <section {HtmlMarkerAttribute}=\"{marker}\">");
             sb.AppendLine($"    <h2>Page {i + 1}</h2>");
 
             var text = page.Text?.Trim();

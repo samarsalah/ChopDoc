@@ -1,6 +1,6 @@
 <section class="panel submit-panel">
   <h2>New conversion job</h2>
-  <p class="hint">Upload a PDF, choose output format, optionally override the size limit (default 2 MB).</p>
+  <p class="hint">Upload a PDF, choose an output format, optionally override the size limit (default 2 MB). Pipeline: PDF → HTML → split/validate → export. Supported exports: HTML, Plain Text, Markdown, DOCX.</p>
 
   <form class="submit-form" (ngSubmit)="submit()">
     <label>
@@ -11,7 +11,16 @@
     <label>
       <span>Output format</span>
       <select [(ngModel)]="outputFormat" name="outputFormat">
-        <option value="Html">HTML</option>
+        <option value="Html">HTML (supported)</option>
+        <option value="PlainText">Plain Text (supported)</option>
+        <option value="Markdown">Markdown (supported)</option>
+        <option value="Docx">DOCX (supported)</option>
+        <option value="Rtf">RTF</option>
+        <option value="Xml">XML</option>
+        <option value="Json">JSON</option>
+        <option value="Csv">CSV</option>
+        <option value="Epub">EPUB</option>
+        <option value="Odt">ODT</option>
       </select>
     </label>
 

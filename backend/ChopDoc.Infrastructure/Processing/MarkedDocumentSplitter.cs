@@ -7,13 +7,17 @@ using ChopDoc.Domain.Models;
 namespace ChopDoc.Infrastructure.Processing;
 
 /// <summary>
-/// Splits converted HTML by marked page sections when over the size limit.
+/// Splits converted content by page markers (HTML sections or ===CHOPDOC:marker=== blocks).
 /// </summary>
-public sealed class HtmlDocumentSplitter : IDocumentSplitter
+public sealed class MarkedDocumentSplitter : IDocumentSplitter
 {
-    private static readonly Regex SectionRegex = new(
+    private static readonly Regex HtmlSectionRegex = new(
         @"<section\s+[^>]*data-chopdoc-marker\s*=\s*""(?<marker>[^""]+)""[^>]*>(?<body>[\s\S]*?)</section>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex TextSectionRegex = new(
+        @"===CHOPDOC:(?<marker>[^=\r\n]+)===\r?\n(?<body>[\s\S]*?)(?======CHOPDOC:|\z)",
+        RegexOptions.Compiled);
 
     public IReadOnlyList<SplitPartContent> SplitIfNeeded(
         byte[] convertedContent,
@@ -30,11 +34,9 @@ public sealed class HtmlDocumentSplitter : IDocumentSplitter
         if (convertedContent.Length == 0)
             throw new UnsupportedOrCorruptedDocumentException("Converted output is empty.");
 
-        var extension = string.IsNullOrWhiteSpace(fileExtension) ? ".html" : fileExtension;
-        if (!extension.StartsWith('.'))
-            extension = "." + extension;
-
+        var extension = NormalizeExtension(fileExtension);
         var safeBase = string.IsNullOrWhiteSpace(baseFileName) ? "document" : baseFileName;
+        var isHtml = extension.Equals(".html", StringComparison.OrdinalIgnoreCase);
 
         if (convertedContent.LongLength <= sizeLimitBytes)
         {
@@ -49,19 +51,19 @@ public sealed class HtmlDocumentSplitter : IDocumentSplitter
             };
         }
 
-        var html = Encoding.UTF8.GetString(convertedContent);
-        var units = ExtractUnits(html);
+        var text = Encoding.UTF8.GetString(convertedContent);
+        var units = isHtml ? ExtractHtmlUnits(text) : ExtractTextUnits(text);
 
         if (units.Count == 0)
         {
-            // Whole document is one unsplittable blob over the limit.
             throw new UnsplittableContentException(
                 $"Converted output is {convertedContent.LongLength} bytes and has no splittable page sections.");
         }
 
         foreach (var unit in units)
         {
-            var unitBytes = Encoding.UTF8.GetByteCount(WrapHtml(unit.SectionHtml));
+            var wrapped = WrapUnitContent(unit.Content, isHtml);
+            var unitBytes = Encoding.UTF8.GetByteCount(wrapped);
             if (unitBytes > sizeLimitBytes)
             {
                 throw new UnsplittableContentException(
@@ -69,15 +71,16 @@ public sealed class HtmlDocumentSplitter : IDocumentSplitter
             }
         }
 
-        var packs = PackUnits(units, sizeLimitBytes);
+        var packs = PackUnits(units, sizeLimitBytes, isHtml);
         var total = packs.Count;
         var parts = new List<SplitPartContent>(total);
 
         for (var i = 0; i < packs.Count; i++)
         {
             var pack = packs[i];
-            var partHtml = WrapHtml(string.Concat(pack.Select(u => u.SectionHtml)));
-            var bytes = Encoding.UTF8.GetBytes(partHtml);
+            var body = string.Concat(pack.Select(u => u.Content));
+            var partText = WrapUnitContent(body, isHtml);
+            var bytes = Encoding.UTF8.GetBytes(partText);
             var markers = string.Join(';', pack.Select(u => u.Marker));
             var fileName = total == 1
                 ? $"{safeBase}{extension}"
@@ -89,34 +92,51 @@ public sealed class HtmlDocumentSplitter : IDocumentSplitter
         return parts;
     }
 
-    private static List<ContentUnit> ExtractUnits(string html)
+    private static string NormalizeExtension(string fileExtension)
+    {
+        var extension = string.IsNullOrWhiteSpace(fileExtension) ? ".bin" : fileExtension;
+        return extension.StartsWith('.') ? extension : "." + extension;
+    }
+
+    private static List<ContentUnit> ExtractHtmlUnits(string html)
     {
         var units = new List<ContentUnit>();
-        foreach (Match match in SectionRegex.Matches(html))
+        foreach (Match match in HtmlSectionRegex.Matches(html))
+            units.Add(new ContentUnit(match.Groups["marker"].Value, match.Value));
+        return units;
+    }
+
+    private static List<ContentUnit> ExtractTextUnits(string text)
+    {
+        var units = new List<ContentUnit>();
+        foreach (Match match in TextSectionRegex.Matches(text))
         {
-            var marker = match.Groups["marker"].Value;
-            var sectionHtml = match.Value;
-            units.Add(new ContentUnit(marker, sectionHtml));
+            var marker = match.Groups["marker"].Value.Trim();
+            var content = $"===CHOPDOC:{marker}===\n{match.Groups["body"].Value}";
+            units.Add(new ContentUnit(marker, content));
         }
 
         return units;
     }
 
-    private static List<List<ContentUnit>> PackUnits(IReadOnlyList<ContentUnit> units, long sizeLimitBytes)
+    private static List<List<ContentUnit>> PackUnits(
+        IReadOnlyList<ContentUnit> units,
+        long sizeLimitBytes,
+        bool isHtml)
     {
         var packs = new List<List<ContentUnit>>();
         var current = new List<ContentUnit>();
-        long currentSize = OverheadBytes();
+        long currentSize = OverheadBytes(isHtml);
 
         foreach (var unit in units)
         {
-            var unitSize = Encoding.UTF8.GetByteCount(unit.SectionHtml);
+            var unitSize = Encoding.UTF8.GetByteCount(unit.Content);
 
             if (current.Count > 0 && currentSize + unitSize > sizeLimitBytes)
             {
                 packs.Add(current);
                 current = new List<ContentUnit>();
-                currentSize = OverheadBytes();
+                currentSize = OverheadBytes(isHtml);
             }
 
             current.Add(unit);
@@ -129,13 +149,16 @@ public sealed class HtmlDocumentSplitter : IDocumentSplitter
         return packs;
     }
 
-    private static long OverheadBytes() =>
-        Encoding.UTF8.GetByteCount(WrapHtml(string.Empty));
+    private static long OverheadBytes(bool isHtml) =>
+        isHtml ? Encoding.UTF8.GetByteCount(WrapHtml(string.Empty)) : 0;
+
+    private static string WrapUnitContent(string content, bool isHtml) =>
+        isHtml ? WrapHtml(content) : content;
 
     private static string WrapHtml(string bodyInnerSections) =>
         "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\" /><title>Converted document part</title></head><body>"
         + bodyInnerSections
         + "</body></html>";
 
-    private sealed record ContentUnit(string Marker, string SectionHtml);
+    private sealed record ContentUnit(string Marker, string Content);
 }

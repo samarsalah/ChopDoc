@@ -1,12 +1,13 @@
-using ChopDoc.Domain.Enums;
 using ChopDoc.Domain.Models;
 
 namespace ChopDoc.Domain.Abstractions;
 
+/// <summary>
+/// Always converts PDF → HTML (canonical intermediate for split/validate).
+/// </summary>
 public interface IDocumentConverter
 {
-    Task<ConversionResult> ConvertAsync(
+    Task<ConversionResult> ConvertPdfToHtmlAsync(
         Stream sourcePdf,
-        OutputFormat outputFormat,
         CancellationToken cancellationToken = default);
 }

@@ -1,3 +1,4 @@
+using ChopDoc.Api.Contracts;
 using ChopDoc.Application.DTOs;
 using ChopDoc.Application.Services;
 using ChopDoc.Domain.Exceptions;
@@ -19,27 +20,26 @@ public sealed class JobsController : ControllerBase
     /// <summary>Submit a PDF for conversion, optional splitting, and validation.</summary>
     [HttpPost]
     [RequestSizeLimit(50_000_000)]
+    [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(JobDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<JobDetailDto>> Submit(
-        [FromForm] IFormFile file,
-        [FromForm] string outputFormat = "Html",
-        [FromForm] double? sizeLimitMb = null,
+        [FromForm] SubmitJobForm form,
         CancellationToken cancellationToken = default)
     {
-        if (file is null || file.Length == 0)
+        if (form.File is null || form.File.Length == 0)
             return BadRequest(new { errorCode = "MISSING_FILE", message = "A PDF file is required." });
 
         try
         {
-            await using var stream = file.OpenReadStream();
+            await using var stream = form.File.OpenReadStream();
             var result = await _jobs.SubmitAsync(
                 new SubmitJobRequest
                 {
                     FileStream = stream,
-                    FileName = file.FileName,
-                    OutputFormat = outputFormat,
-                    SizeLimitMb = sizeLimitMb
+                    FileName = form.File.FileName,
+                    OutputFormat = form.OutputFormat,
+                    SizeLimitMb = form.SizeLimitMb
                 },
                 cancellationToken);
 

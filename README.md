@@ -3,7 +3,7 @@
 Document Conversion & Splitting Service — DigiArenas Senior Full Stack assessment.
 
 **Stack:** Angular 17 + .NET 8 (modular monolith)  
-**Conversion target:** PDF → **HTML** (rule-based, no OCR)
+**Conversion target:** PDF → **HTML** (canonical intermediate), then export to HTML / Plain Text / Markdown / **DOCX**
 
 ---
 
@@ -46,7 +46,8 @@ cd backend/ChopDoc.Api
 dotnet run --launch-profile http
 ```
 
-API: **http://localhost:5105**
+API: **http://localhost:5105**  
+Swagger UI: **http://localhost:5105/swagger** (also opens from `/`)
 
 On startup the app creates SQLite DB + storage under `ChopDoc.Api/App_Data/`.
 

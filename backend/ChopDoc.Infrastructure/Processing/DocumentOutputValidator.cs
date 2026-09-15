@@ -7,9 +7,13 @@ namespace ChopDoc.Infrastructure.Processing;
 
 public sealed class DocumentOutputValidator : IOutputValidator
 {
-    private static readonly Regex MarkerRegex = new(
+    private static readonly Regex HtmlMarkerRegex = new(
         @"data-chopdoc-marker\s*=\s*""(?<marker>[^""]+)""",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex TextMarkerRegex = new(
+        @"===CHOPDOC:(?<marker>[^=\r\n]+)===",
+        RegexOptions.Compiled);
 
     public ValidationResult Validate(IReadOnlyList<SplitPartContent> parts, long sizeLimitBytes)
     {
@@ -47,14 +51,12 @@ public sealed class DocumentOutputValidator : IOutputValidator
                 return ValidationResult.Failure(
                     $"Part {part.PartNumber} is {part.Content.LongLength} bytes, exceeding limit {sizeLimitBytes}.");
 
-            var html = Encoding.UTF8.GetString(part.Content);
-            var markersInPart = MarkerRegex.Matches(html)
-                .Select(m => m.Groups["marker"].Value)
-                .ToList();
-
             // Single-part under-limit path uses marker "full-document" without sections.
             if (part.ContentMarker == "full-document")
                 continue;
+
+            var content = Encoding.UTF8.GetString(part.Content);
+            var markersInPart = ExtractMarkers(content);
 
             var declared = part.ContentMarker
                 .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -66,7 +68,7 @@ public sealed class DocumentOutputValidator : IOutputValidator
                 && !declared.All(d => markersInPart.Contains(d, StringComparer.OrdinalIgnoreCase)))
             {
                 return ValidationResult.Failure(
-                    $"Part {part.PartNumber} marker mismatch between metadata and HTML content.");
+                    $"Part {part.PartNumber} marker mismatch between metadata and content.");
             }
 
             foreach (var marker in declared)
@@ -77,5 +79,19 @@ public sealed class DocumentOutputValidator : IOutputValidator
         }
 
         return ValidationResult.Success();
+    }
+
+    private static List<string> ExtractMarkers(string content)
+    {
+        var html = HtmlMarkerRegex.Matches(content)
+            .Select(m => m.Groups["marker"].Value)
+            .ToList();
+
+        if (html.Count > 0)
+            return html;
+
+        return TextMarkerRegex.Matches(content)
+            .Select(m => m.Groups["marker"].Value.Trim())
+            .ToList();
     }
 }

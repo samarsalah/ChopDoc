@@ -1,12 +1,20 @@
 namespace ChopDoc.Domain.Enums;
 
 /// <summary>
-/// Supported conversion targets. Assessment converts PDF → HTML.
-/// Extra values can be added later without changing the job pipeline (OCP).
+/// Conversion targets. HTML / PlainText / Markdown are implemented.
+/// Other values are selectable so unsupported-format handling is visible end-to-end (OCP-ready).
 /// </summary>
 public enum OutputFormat
 {
-    /// <summary>Used when the client requested an unsupported/unknown format (job still persisted).</summary>
     Unspecified = 0,
-    Html = 1
+    Html = 1,
+    PlainText = 2,
+    Markdown = 3,
+    Docx = 4,
+    Rtf = 5,
+    Xml = 6,
+    Json = 7,
+    Csv = 8,
+    Epub = 9,
+    Odt = 10
 }
