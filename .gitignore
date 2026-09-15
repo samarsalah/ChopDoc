@@ -1,0 +1,14 @@
+# Ignore local runtime data
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.angular/
+**/App_Data/
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+.idea/
+.vscode/
+*.user

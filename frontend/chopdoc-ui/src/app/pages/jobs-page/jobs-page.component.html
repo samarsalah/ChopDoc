@@ -1,0 +1,112 @@
+<section class="panel submit-panel">
+  <h2>New conversion job</h2>
+  <p class="hint">Upload a PDF, choose output format, optionally override the size limit (default 2 MB).</p>
+
+  <form class="submit-form" (ngSubmit)="submit()">
+    <label>
+      <span>Source PDF</span>
+      <input type="file" accept=".pdf,application/pdf" (change)="onFileSelected($event)" />
+    </label>
+
+    <label>
+      <span>Output format</span>
+      <select [(ngModel)]="outputFormat" name="outputFormat">
+        <option value="Html">HTML</option>
+      </select>
+    </label>
+
+    <label>
+      <span>Size limit (MB)</span>
+      <input type="number" min="0.01" step="0.1" [(ngModel)]="sizeLimitMb" name="sizeLimitMb" />
+    </label>
+
+    <button type="submit" [disabled]="submitting">
+      {{ submitting ? 'Processing…' : 'Submit job' }}
+    </button>
+  </form>
+
+  <p class="message error" *ngIf="errorMessage">{{ errorMessage }}</p>
+  <p class="message ok" *ngIf="successMessage">{{ successMessage }}</p>
+</section>
+
+<section class="layout">
+  <div class="panel">
+    <div class="panel-header">
+      <h2>Job history</h2>
+      <button type="button" class="ghost" (click)="refreshList()" [disabled]="loadingList">
+        {{ loadingList ? 'Refreshing…' : 'Refresh' }}
+      </button>
+    </div>
+
+    <table *ngIf="jobs.length; else emptyJobs">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Status</th>
+          <th>Parts</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          *ngFor="let job of jobs"
+          (click)="openJob(job)"
+          [class.active]="selected?.id === job.id">
+          <td>{{ job.originalFileName }}</td>
+          <td><span [class]="statusClass(job.status)">{{ job.status }}</span></td>
+          <td>{{ job.partCount }}</td>
+          <td>{{ formatDate(job.createdAtUtc) }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <ng-template #emptyJobs>
+      <p class="hint">No jobs yet. Submit a PDF to get started.</p>
+    </ng-template>
+  </div>
+
+  <div class="panel detail-panel">
+    <h2>Job detail</h2>
+
+    <p class="hint" *ngIf="!selected && !loadingDetail">Select a job to inspect status, history, and downloads.</p>
+    <p class="hint" *ngIf="loadingDetail">Loading detail…</p>
+
+    <ng-container *ngIf="selected as job">
+      <dl class="meta">
+        <div><dt>File</dt><dd>{{ job.originalFileName }}</dd></div>
+        <div><dt>Status</dt><dd><span [class]="statusClass(job.status)">{{ job.status }}</span></dd></div>
+        <div><dt>Format</dt><dd>{{ job.outputFormat }}</dd></div>
+        <div><dt>Size limit</dt><dd>{{ formatBytes(job.sizeLimitBytes) }}</dd></div>
+        <div><dt>Created</dt><dd>{{ formatDate(job.createdAtUtc) }}</dd></div>
+        <div><dt>Completed</dt><dd>{{ formatDate(job.completedAtUtc) }}</dd></div>
+      </dl>
+
+      <p class="message error" *ngIf="job.errorMessage">
+        <strong>{{ job.errorCode }}</strong> — {{ job.errorMessage }}
+      </p>
+
+      <h3>Output parts</h3>
+      <ul class="parts" *ngIf="job.parts.length; else noParts">
+        <li *ngFor="let part of job.parts">
+          <div>
+            <strong>{{ part.sequenceLabel }}</strong>
+            <span>{{ part.fileName }} · {{ formatBytes(part.sizeBytes) }}</span>
+          </div>
+          <button type="button" class="ghost" (click)="downloadPart(part.id)">Download</button>
+        </li>
+      </ul>
+      <ng-template #noParts>
+        <p class="hint">No downloadable parts for this job.</p>
+      </ng-template>
+
+      <h3>History</h3>
+      <ol class="history">
+        <li *ngFor="let entry of job.history">
+          <span [class]="statusClass(entry.status)">{{ entry.status }}</span>
+          <span class="when">{{ formatDate(entry.occurredAtUtc) }}</span>
+          <p>{{ entry.message }}</p>
+        </li>
+      </ol>
+    </ng-container>
+  </div>
+</section>

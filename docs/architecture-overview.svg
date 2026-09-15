@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="ChopDoc modular monolith architecture">
+  <rect width="1280" height="720" fill="#f7faf8"/>
+  <text x="640" y="48" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700" fill="#0f6e56">ChopDoc  Modular Monolith</text>
+  <text x="640" y="78" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#5b6777">Angular + .NET 8 · SOLID boundaries · one deployable API</text>
+
+  <rect x="360" y="100" width="560" height="70" rx="0" fill="#ffffff" stroke="#0f6e56" stroke-width="2"/>
+  <text x="640" y="130" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#132033">Angular UI</text>
+  <text x="640" y="152" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#5b6777">Submit PDF · Job history · Download parts</text>
+
+  <line x1="640" y1="170" x2="640" y2="200" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="360" y="200" width="560" height="70" rx="0" fill="#ffffff" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="640" y="230" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#132033">ChopDoc.Api</text>
+  <text x="640" y="252" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#5b6777">Controllers · CORS (config) · Startup wiring</text>
+
+  <line x1="640" y1="270" x2="640" y2="300" stroke="#334155" stroke-width="2"/>
+
+  <rect x="360" y="300" width="560" height="70" rx="0" fill="#ffffff" stroke="#0f6e56" stroke-width="2"/>
+  <text x="640" y="330" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#132033">Application · DocumentJobService</text>
+  <text x="640" y="352" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#5b6777">Orchestrates Convert ’ Split ’ Validate · persists history</text>
+
+  <line x1="480" y1="370" x2="250" y2="420" stroke="#334155" stroke-width="2"/>
+  <line x1="640" y1="370" x2="640" y2="420" stroke="#334155" stroke-width="2"/>
+  <line x1="800" y1="370" x2="1030" y2="420" stroke="#334155" stroke-width="2"/>
+
+  <rect x="80" y="420" width="280" height="80" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+  <text x="220" y="450" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#132033">IDocumentConverter</text>
+  <text x="220" y="475" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#5b6777">PdfPig ’ HTML</text>
+
+  <rect x="500" y="420" width="280" height="80" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+  <text x="640" y="450" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#132033">IDocumentSplitter</text>
+  <text x="640" y="475" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#5b6777">Size-based ordered parts</text>
+
+  <rect x="920" y="420" width="280" height="80" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+  <text x="1060" y="450" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#132033">IOutputValidator</text>
+  <text x="1060" y="475" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#5b6777">Completeness / consistency</text>
+
+  <rect x="80" y="540" width="1120" height="100" fill="#ffffff" stroke="#0f6e56" stroke-width="2"/>
+  <text x="640" y="575" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#0f6e56">Infrastructure</text>
+  <text x="640" y="605" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#334155">EF Core + SQLite  ·  Local file storage  ·  PdfPig adapter  ·  Splitter / Validator implementations</text>
+  <text x="640" y="625" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#5b6777">Domain never references EF or PdfPig (Dependency Inversion)</text>
+
+  <rect x="980" y="100" width="220" height="280" fill="#eef7f3" stroke="#0f6e56" stroke-width="1.5"/>
+  <text x="1090" y="128" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f6e56">Job lifecycle</text>
+  <text x="1090" y="160" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#132033">Queued</text>
+  <text x="1090" y="185" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#132033">Converting</text>
+  <text x="1090" y="210" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#132033">Splitting</text>
+  <text x="1090" y="235" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#132033">Validating</text>
+  <text x="1090" y="270" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#0f6e56">Completed</text>
+  <text x="1090" y="300" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#9f1239">Failed</text>
+  <text x="1090" y="325" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#9a3412">NeedsReview</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#334155"/>
+    </marker>
+  </defs>
+</svg>

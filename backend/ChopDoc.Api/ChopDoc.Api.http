@@ -1,0 +1,6 @@
+@ChopDoc.Api_HostAddress = http://localhost:5105
+
+### List jobs
+GET {{ChopDoc.Api_HostAddress}}/api/jobs
+
+###
