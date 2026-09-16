@@ -7,4 +7,6 @@ public sealed record ConversionResult(
     string ContentType,
     string FileExtension,
     OutputFormat Format,
-    int PageCount);
+    int PageCount,
+    IReadOnlyList<string> PageMarkers,
+    IReadOnlyList<string> Warnings);

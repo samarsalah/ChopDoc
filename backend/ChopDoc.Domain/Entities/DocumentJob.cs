@@ -93,6 +93,19 @@ public class DocumentJob
         CompletedAtUtc = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Records something the pipeline had to work around without changing the outcome, so it
+    /// shows up in the job's history instead of only in the logs.
+    /// </summary>
+    public void AddWarning(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+
+        AddHistory(Status, message);
+        Touch();
+    }
+
     public void ReplaceParts(IEnumerable<DocumentPart> parts)
     {
         _parts.Clear();

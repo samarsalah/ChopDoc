@@ -33,13 +33,15 @@ public sealed class PdfDocumentConverter : IDocumentConverter
             if (string.IsNullOrWhiteSpace(combinedText))
                 throw new ScannedDocumentException();
 
-            var html = BuildHtml(pages);
+            var built = BuildHtml(pages);
             return Task.FromResult(new ConversionResult(
-                Encoding.UTF8.GetBytes(html),
+                Encoding.UTF8.GetBytes(built.Html),
                 "text/html; charset=utf-8",
                 ".html",
                 OutputFormat.Html,
-                pages.Count));
+                pages.Count,
+                built.PageMarkers,
+                built.Warnings));
         }
         catch (DomainException)
         {
@@ -51,8 +53,10 @@ public sealed class PdfDocumentConverter : IDocumentConverter
         }
     }
 
-    private static string BuildHtml(IReadOnlyList<Page> pages)
+    private static HtmlBuildResult BuildHtml(IReadOnlyList<Page> pages)
     {
+        var markers = new List<string>(pages.Count);
+        var warnings = new List<string>();
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
         sb.AppendLine("<html lang=\"en\">");
@@ -67,6 +71,7 @@ public sealed class PdfDocumentConverter : IDocumentConverter
         {
             var page = pages[i];
             var marker = $"page-{i + 1}";
+            markers.Add(marker);
             sb.AppendLine($"  <section {HtmlMarkerAttribute}=\"{marker}\">");
             sb.AppendLine($"    <h2>Page {i + 1}</h2>");
 
@@ -89,14 +94,14 @@ public sealed class PdfDocumentConverter : IDocumentConverter
                 AppendBlocks(sb, blocks);
             }
 
-            AppendImages(sb, page, i + 1);
+            AppendImages(sb, page, i + 1, warnings);
 
             sb.AppendLine("  </section>");
         }
 
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");
-        return sb.ToString();
+        return new HtmlBuildResult(sb.ToString(), markers, warnings);
     }
 
     private static void AppendBlocks(StringBuilder sb, IReadOnlyList<LayoutBlock> blocks)
@@ -133,7 +138,7 @@ public sealed class PdfDocumentConverter : IDocumentConverter
             sb.AppendLine("    </ul>");
     }
 
-    private static void AppendImages(StringBuilder sb, Page page, int pageNumber)
+    private static void AppendImages(StringBuilder sb, Page page, int pageNumber, List<string> warnings)
     {
         var seen = new HashSet<string>();
         foreach (var image in page.GetImages())
@@ -147,7 +152,11 @@ public sealed class PdfDocumentConverter : IDocumentConverter
                 continue;
 
             if (!TryGetImageBytes(image, out var bytes, out var mime))
+            {
+                warnings.Add(
+                    $"Page {pageNumber}: an embedded image uses an encoding that cannot be copied across and was left out of the output.");
                 continue;
+            }
 
             var base64 = Convert.ToBase64String(bytes);
             sb.AppendLine($"    <img src=\"data:{mime};base64,{base64}\" alt=\"Image from page {pageNumber}\" />");
@@ -159,6 +168,11 @@ public sealed class PdfDocumentConverter : IDocumentConverter
             .Select(p => p.Trim())
             .Where(p => p.Length > 0);
 
+    /// <summary>
+    /// Copies the image across untouched. PdfPig can only build a PNG for the encodings it
+    /// decodes itself; a JPEG-encoded image (DCTDecode) comes back as raw bytes that are
+    /// already a valid JPEG file, so it can be embedded as-is.
+    /// </summary>
     private static bool TryGetImageBytes(IPdfImage image, out byte[] bytes, out string mime)
     {
         bytes = Array.Empty<byte>();
@@ -172,6 +186,14 @@ public sealed class PdfDocumentConverter : IDocumentConverter
                 mime = "image/png";
                 return true;
             }
+
+            var raw = image.RawBytes.ToArray();
+            if (IsJpeg(raw))
+            {
+                bytes = raw;
+                mime = "image/jpeg";
+                return true;
+            }
         }
         catch
         {
@@ -180,4 +202,12 @@ public sealed class PdfDocumentConverter : IDocumentConverter
 
         return false;
     }
+
+    private static bool IsJpeg(byte[] content) =>
+        content.Length > 3 && content[0] == 0xFF && content[1] == 0xD8 && content[2] == 0xFF;
+
+    private sealed record HtmlBuildResult(
+        string Html,
+        IReadOnlyList<string> PageMarkers,
+        IReadOnlyList<string> Warnings);
 }

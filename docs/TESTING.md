@@ -7,7 +7,7 @@ cd backend
 dotnet test
 ```
 
-Expected: **all tests passed** (conversion, splitting, validation, job status).
+Expected: **31 tests passed** (conversion, splitting, validation, job status, pipeline).
 
 What they prove:
 
@@ -15,8 +15,12 @@ What they prove:
 - No text layer → `SCANNED_DOCUMENT`  
 - Corrupted PDF → unsupported/corrupted  
 - Split under / exact / over limit  
+- Splitting is sized by the **exported** format: a large HTML intermediate that exports small stays one part, and a format that inflates produces more parts  
+- Atom expansion keeps text that sits outside block elements  
 - Unsplittable section → exception  
 - Validator catches missing/duplicate/oversized parts  
+- Validator catches a **missing source page** even when the parts are internally consistent  
+- End-to-end pipeline: same PDF gives one plain-text part and several HTML parts at the same limit  
 
 ---
 
@@ -45,8 +49,9 @@ npm start
 | 2 | Upload `samples/multipage-text-sample.pdf`, limit **0.01** | **Completed** with **multiple parts** (`part N of M`) |
 | 3 | Upload `samples/scanned-no-text-sample.pdf` | **Failed**, error `SCANNED_DOCUMENT`, visible in history |
 | 4 | Upload a `.txt` renamed or non-PDF | **Failed** job persisted (`UNSUPPORTED_OR_CORRUPTED_INPUT`) |
-| 5 | Submit with output format `Docx` (via API) | **Failed** job (`UNSUPPORTED_OUTPUT_FORMAT`) |
+| 5 | Submit with output format `Rtf` (via API) | **Failed** job (`UNSUPPORTED_OUTPUT_FORMAT`) |
 | 6 | Click a past job in history | Detail shows timeline + downloads when completed |
+| 7 | Same multipage PDF at limit `0.01`, once as **HTML** and once as **Plain Text** | HTML splits into several parts; plain text needs fewer or one — the limit follows the delivered format |
 
 ### Force splitting tip
 
@@ -75,4 +80,4 @@ curl http://localhost:5105/api/health
 1. Run `dotnet test` once the morning of the interview.  
 2. Keep both API + UI running before the call.  
 3. Have the three sample PDFs ready.  
-4. Be ready to open `DocumentJobService`, `PdfToHtmlConverter`, `HtmlDocumentSplitter`, `DocumentOutputValidator` and walk the flow.
+4. Be ready to open `DocumentJobService`, `PdfDocumentConverter`, `MarkedDocumentSplitter`, `DocumentOutputValidator` and walk the flow.

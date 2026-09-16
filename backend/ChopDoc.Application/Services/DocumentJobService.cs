@@ -5,6 +5,7 @@ using ChopDoc.Domain.Abstractions;
 using ChopDoc.Domain.Entities;
 using ChopDoc.Domain.Enums;
 using ChopDoc.Domain.Exceptions;
+using ChopDoc.Domain.Models;
 using Microsoft.Extensions.Options;
 
 namespace ChopDoc.Application.Services;
@@ -130,20 +131,28 @@ public sealed class DocumentJobService : IDocumentJobService
             job.MarkConverting();
 
             await using var source = await _files.OpenReadAsync(job.StoredSourcePath, cancellationToken);
-            var html = await _converter.ConvertPdfToHtmlAsync(source, cancellationToken);
+            var converted = await _converter.ConvertPdfToHtmlAsync(source, cancellationToken);
+
+            foreach (var warning in converted.Warnings)
+                job.AddWarning(warning);
 
             job.MarkSplitting();
 
             var baseName = Path.GetFileNameWithoutExtension(job.OriginalFileName);
-            var htmlParts = _splitter.SplitIfNeeded(
-                html.Content,
+            var intermediateParts = _splitter.SplitIfNeeded(
+                converted.Content,
                 baseName,
                 ".html",
-                job.SizeLimitBytes);
+                job.SizeLimitBytes,
+                MeasureExportedSize(baseName, job.RequestedOutputFormat));
+
+            // Export into memory before validating: the limit applies to the artifact that is
+            // handed off, and nothing reaches storage until validation has passed.
+            var exportedParts = ExportParts(intermediateParts, baseName, job.RequestedOutputFormat);
 
             job.MarkValidating();
 
-            var validation = _validator.Validate(htmlParts, job.SizeLimitBytes);
+            var validation = Validate(intermediateParts, exportedParts, converted.PageMarkers, job.SizeLimitBytes);
             if (!validation.IsValid)
             {
                 job.MarkNeedsReview(new OutputValidationException(validation.FailureReason ?? "Unknown validation failure."));
@@ -151,20 +160,13 @@ public sealed class DocumentJobService : IDocumentJobService
                 return;
             }
 
-            var persistedParts = new List<DocumentPart>();
-            foreach (var part in htmlParts)
+            var persistedParts = new List<DocumentPart>(exportedParts.Count);
+            foreach (var part in exportedParts)
             {
-                var exported = _exporter.Export(
-                    part.Content,
-                    baseName,
-                    part.PartNumber,
-                    part.TotalParts,
-                    job.RequestedOutputFormat);
-
                 var path = await _files.SaveAsync(
-                    exported.Content,
+                    part.Content,
                     $"jobs/{job.Id:N}/parts",
-                    exported.FileName,
+                    part.FileName,
                     cancellationToken);
 
                 persistedParts.Add(new DocumentPart(
@@ -172,8 +174,8 @@ public sealed class DocumentJobService : IDocumentJobService
                     part.PartNumber,
                     part.TotalParts,
                     path,
-                    exported.Content.LongLength,
-                    exported.FileName));
+                    part.Content.LongLength,
+                    part.FileName));
             }
 
             job.ReplaceParts(persistedParts);
@@ -190,11 +192,64 @@ public sealed class DocumentJobService : IDocumentJobService
             job.MarkFailed(ex);
             await _jobs.UpdateAsync(job, cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            // The caller is gone, so record the outcome on a token that is still usable rather
+            // than leaving the job stuck mid-pipeline.
+            job.MarkFailed("REQUEST_CANCELLED", "The request was cancelled before processing finished.");
+            await _jobs.UpdateAsync(job, CancellationToken.None);
+        }
         catch (Exception ex)
         {
-            job.MarkFailed("UNEXPECTED_ERROR", ex.Message);
+            // Exception details belong in the logs, not in a field the API hands to clients.
+            job.MarkFailed("UNEXPECTED_ERROR", $"Processing failed unexpectedly ({ex.GetType().Name}).");
             await _jobs.UpdateAsync(job, cancellationToken);
         }
+    }
+
+    /// <summary>Lets the splitter size a candidate part in the format the job asked for.</summary>
+    private ExportedSizeProbe MeasureExportedSize(string baseName, OutputFormat format) =>
+        htmlContent => _exporter.Export(htmlContent, baseName, 1, 1, format).Content.LongLength;
+
+    private List<ExportedPart> ExportParts(
+        IReadOnlyList<SplitPartContent> intermediateParts,
+        string baseName,
+        OutputFormat format)
+    {
+        var exported = new List<ExportedPart>(intermediateParts.Count);
+        foreach (var part in intermediateParts)
+        {
+            var result = _exporter.Export(
+                part.Content,
+                baseName,
+                part.PartNumber,
+                part.TotalParts,
+                format);
+
+            exported.Add(new ExportedPart(
+                part.PartNumber,
+                part.TotalParts,
+                result.Content,
+                result.FileName));
+        }
+
+        return exported;
+    }
+
+    /// <summary>
+    /// Structure and completeness are checked on the intermediate, where the section markers
+    /// live; size and sequence are checked on the exported parts, which are what get delivered.
+    /// </summary>
+    private ValidationResult Validate(
+        IReadOnlyList<SplitPartContent> intermediateParts,
+        IReadOnlyList<ExportedPart> exportedParts,
+        IReadOnlyCollection<string> expectedMarkers,
+        long sizeLimitBytes)
+    {
+        var structure = _validator.ValidateStructure(intermediateParts, expectedMarkers);
+        return structure.IsValid
+            ? _validator.ValidateExportedParts(exportedParts, sizeLimitBytes)
+            : structure;
     }
 
     private async Task<JobDetailDto> GetRequiredDetailAsync(Guid id, CancellationToken cancellationToken)

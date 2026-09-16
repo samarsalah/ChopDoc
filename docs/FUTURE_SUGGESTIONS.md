@@ -12,10 +12,13 @@ Priority legend: **P0** = high value / interview-ready stretch · **P1** = stron
 |----|------------|----------|--------|
 | F1 | **PDF export** (HTML → PDF via QuestPDF or PdfSharp) | P0 | Same HTML-first path as DOCX; page-based parts |
 | F2 | **Richer DOCX** (styles, tables, better image sizing) | P1 | Open XML already in place |
-| F3 | Apply size limit on **final** export bytes, not only HTML | P1 | Today limit is on intermediate HTML (documented trade-off) |
+| F3 | ~~Apply size limit on final export bytes~~ | **Done** | `ExportedSizeProbe`; packing and validation both measure the exported artifact |
 | F4 | Real **image-only scanned** sample PDF (embedded image, no text) | P1 | Current sample = empty text layer (same business rule) |
-| F5 | Content **hashing** across parts for stronger validation | P1 | Prove no loss/duplication beyond markers |
+| F5 | Content **hashing** across parts for stronger validation | P1 | Coverage is page-level today; hashing would catch sub-page loss |
 | F6 | More exporters (RTF/XML/JSON) behind `IOutputExporter` | P2 | UI already lists some as unsupported |
+| F7 | **Cache export measurements** while packing | P1 | Each candidate pack is a real export; fine at this size, wasteful for large DOCX |
+| F8 | **Per-page text density** for scanned detection | P1 | Today one stray character makes a scanned PDF look convertible |
+| F9 | Wider image passthrough (JPX/CMYK, not just PNG + JPEG) | P2 | Unsupported encodings currently surface as job warnings |
 
 ---
 
@@ -67,8 +70,11 @@ Priority legend: **P0** = high value / interview-ready stretch · **P1** = stron
 ## Interview / product talking points
 
 - Keep defending **HTML as intermediate**: one convert, one split/validate, many exporters.
+- The limit is enforced on the **delivered artifact**, not the intermediate — boundaries come from HTML units, sizes come from a real export.
+- Validation proves **coverage**, not just internal consistency: every source page has to appear in the output.
 - Prefer **modular monolith → worker** before microservices.
 - **Failed** vs **NeedsReview** stays intentional: rules violation vs output integrity concern.
+- Non-fatal problems (undecodable image) become **history warnings**, not silent skips.
 - Depth on edges (scanned, unsplittable, exact limit) beats adding many shallow formats.
 
 ---
@@ -79,4 +85,4 @@ Priority legend: **P0** = high value / interview-ready stretch · **P1** = stron
 2. After submission: pick one vertical (e.g. async jobs + PDF export) and implement end-to-end.  
 3. When adding a feature, tick/move the row here or link a PR.
 
-*Last focused areas shipped:* HTML-first pipeline, DOCX via Open XML, Swagger at `/swagger`, multi-format UI options.
+*Last focused areas shipped:* export-aware splitting and validation (F3), page-level coverage validation, JPEG image passthrough with history warnings, HTML-first pipeline, DOCX via Open XML, Swagger at `/swagger`, multi-format UI options.

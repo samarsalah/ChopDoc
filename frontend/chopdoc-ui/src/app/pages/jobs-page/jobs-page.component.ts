@@ -37,9 +37,9 @@ export class JobsPageComponent implements OnInit {
   readonly pipelineSteps: PipelineStep[] = [
     { key: 'Queued', label: 'Queued', hint: 'Job accepted and saved' },
     { key: 'Converting', label: 'Convert', hint: 'PDF → HTML intermediate' },
-    { key: 'Splitting', label: 'Split', hint: 'Break oversize output into parts' },
-    { key: 'Validating', label: 'Validate', hint: 'Check parts are complete' },
-    { key: 'Completed', label: 'Export', hint: 'Write HTML / Text / DOCX' }
+    { key: 'Splitting', label: 'Split', hint: 'Sized in the requested output format' },
+    { key: 'Validating', label: 'Validate', hint: 'Exported parts complete and within limit' },
+    { key: 'Completed', label: 'Deliver', hint: 'Parts written to storage' }
   ];
 
   submitting = false;

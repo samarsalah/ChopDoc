@@ -8,4 +8,8 @@ public sealed record SplitPartContent(
     int TotalParts,
     byte[] Content,
     string FileName,
-    string ContentMarker);
+    string ContentMarker)
+{
+    /// <summary>Marker used when the whole converted document fits in one part.</summary>
+    public const string FullDocumentMarker = "full-document";
+}

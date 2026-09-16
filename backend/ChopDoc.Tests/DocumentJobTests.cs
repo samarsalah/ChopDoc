@@ -29,4 +29,17 @@ public class DocumentJobTests
         Assert.Equal(JobStatus.NeedsReview, job.Status);
         Assert.Equal("UNSPLITTABLE_CONTENT", job.ErrorCode);
     }
+
+    [Fact]
+    public void AddWarning_IsVisibleInHistoryWithoutChangingOutcome()
+    {
+        var job = new DocumentJob("a.pdf", "sources/a.pdf", OutputFormat.Html, 2_000_000);
+
+        job.MarkConverting();
+        job.AddWarning("Page 2: an embedded image could not be copied across.");
+
+        Assert.Equal(JobStatus.Converting, job.Status);
+        Assert.Null(job.ErrorCode);
+        Assert.Contains(job.History, h => h.Message.StartsWith("Page 2:"));
+    }
 }

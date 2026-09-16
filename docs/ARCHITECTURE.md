@@ -26,7 +26,15 @@ One deployable (.NET API) with projects:
 - **Domain** — entities, status transitions, exceptions, interfaces  
 - **Infrastructure** — PdfPig, EF Core/SQLite, disk storage, splitter/validator implementations  
 
-Convert / split / validate are **separate services behind interfaces**, not separate microservices.
+Convert / split / export / validate are **separate services behind interfaces**, not separate microservices.
+
+### Stage order, and why it matters
+
+```
+Convert → Split → Export (in memory) → Validate → Persist
+```
+
+Export sits before validation on purpose. The size limit applies to the file that is handed off, so validation has to see the exported bytes — and because export happens in memory, a validation failure leaves nothing behind in storage. The splitter still works on HTML units (a DOCX is a zip and cannot be cut in half), but it sizes every candidate part through an `ExportedSizeProbe`, which is a real export in the requested format.
 
 ### Evolution path (say this in the interview)
 

@@ -21,6 +21,10 @@ public class PdfDocumentConverterTests
         Assert.Equal(".html", result.FileExtension);
         Assert.Equal(2, result.PageCount);
 
+        // Validation uses these to prove every source page reached the output.
+        Assert.Equal(new[] { "page-1", "page-2" }, result.PageMarkers);
+        Assert.Empty(result.Warnings);
+
         var html = System.Text.Encoding.UTF8.GetString(result.Content);
         Assert.Contains("data-chopdoc-marker=\"page-1\"", html);
         Assert.Contains("data-chopdoc-marker=\"page-2\"", html);
