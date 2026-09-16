@@ -63,7 +63,7 @@ public class MarkedDocumentSplitterTests
 
     /// <summary>
     /// The limit applies to the delivered artifact. A large HTML intermediate that exports to a
-    /// small file (plain text, DOCX) must not be split.
+    /// small file (DOCX) must not be split.
     /// </summary>
     [Fact]
     public void SplitIfNeeded_WhenExportedOutputFitsLimit_DoesNotSplit()

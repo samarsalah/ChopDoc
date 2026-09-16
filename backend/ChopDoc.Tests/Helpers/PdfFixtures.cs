@@ -61,6 +61,38 @@ public static class PdfFixtures
         return BuildPdf(objectBodies);
     }
 
+    /// <summary>
+    /// One page laid out top to bottom as text, image, text. The image is uncompressed RGB
+    /// samples behind ASCIIHexDecode, which keeps the whole PDF assemblable as a string.
+    /// </summary>
+    public static byte[] CreateTextPdfWithImageBetweenParagraphs(
+        string topText,
+        string bottomText)
+    {
+        const int size = 8;
+        var samples = string.Concat(Enumerable.Repeat("FF0000", size * size)) + ">";
+
+        var content =
+            $"BT /F1 18 Tf 72 700 Td ({EscapePdfString(topText)}) Tj ET\n" +
+            "q 200 0 0 100 72 400 cm /Im1 Do Q\n" +
+            $"BT /F1 18 Tf 72 200 Td ({EscapePdfString(bottomText)}) Tj ET";
+
+        var objectBodies = new Dictionary<int, string>
+        {
+            [1] = "<< /Type /Catalog /Pages 2 0 R >>",
+            [2] = "<< /Type /Pages /Kids [ 3 0 R ] /Count 1 >>",
+            [3] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R " +
+                  "/Resources << /Font << /F1 5 0 R >> /XObject << /Im1 6 0 R >> >> >>",
+            [4] = $"<< /Length {Encoding.ASCII.GetByteCount(content)} >>\nstream\n{content}\nendstream",
+            [5] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+            [6] = $"<< /Type /XObject /Subtype /Image /Width {size} /Height {size} " +
+                  "/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /ASCIIHexDecode " +
+                  $"/Length {samples.Length} >>\nstream\n{samples}\nendstream"
+        };
+
+        return BuildPdf(objectBodies);
+    }
+
     /// <summary>Valid PDF page with an empty content stream (no extractable text).</summary>
     public static byte[] CreateNoTextPdf()
     {

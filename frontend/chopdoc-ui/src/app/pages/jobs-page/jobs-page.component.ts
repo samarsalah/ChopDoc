@@ -29,7 +29,6 @@ export class JobsPageComponent implements OnInit {
 
   readonly outputFormats = [
     { value: 'Html', label: 'HTML' },
-    { value: 'PlainText', label: 'Plain Text' },
     { value: 'Docx', label: 'DOCX' }
   ];
 

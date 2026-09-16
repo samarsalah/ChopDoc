@@ -54,9 +54,8 @@ public sealed class MarkedDocumentSplitter : IDocumentSplitter
         var isHtml = extension.Equals(".html", StringComparison.OrdinalIgnoreCase);
         var measure = new PartSizeProbe(isHtml, measureExportedSize);
 
-        // Measured in the delivered format: plain text and DOCX are usually much smaller than
-        // the HTML they came from, so judging by the intermediate would split documents that
-        // would have fit into a single part.
+        // Measured in the delivered format: DOCX is often smaller than the HTML it came from,
+        // so judging by the intermediate would split documents that would have fit into a single part.
         if (measure.SizeOfWholeDocument(convertedContent) <= sizeLimitBytes)
         {
             return new[]

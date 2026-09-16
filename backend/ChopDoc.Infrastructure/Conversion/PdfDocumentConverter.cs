@@ -76,6 +76,8 @@ public sealed class PdfDocumentConverter : IDocumentConverter
             sb.AppendLine($"    <h2>Page {i + 1}</h2>");
 
             var blocks = PdfPageLayout.ExtractBlocks(page);
+            var images = CollectImages(page, i + 1, warnings);
+
             if (blocks.Count == 0)
             {
                 var text = page.Text?.Trim();
@@ -88,13 +90,14 @@ public sealed class PdfDocumentConverter : IDocumentConverter
                         sb.AppendLine("</p>");
                     }
                 }
+
+                // No positioned blocks to interleave with.
+                AppendImageTags(sb, images);
             }
             else
             {
-                AppendBlocks(sb, blocks);
+                AppendPageContent(sb, blocks, images);
             }
-
-            AppendImages(sb, page, i + 1, warnings);
 
             sb.AppendLine("  </section>");
         }
@@ -104,11 +107,35 @@ public sealed class PdfDocumentConverter : IDocumentConverter
         return new HtmlBuildResult(sb.ToString(), markers, warnings);
     }
 
-    private static void AppendBlocks(StringBuilder sb, IReadOnlyList<LayoutBlock> blocks)
+    /// <summary>
+    /// Writes the page's text and images in the order they appear down the page. Images are
+    /// slotted between blocks by vertical position rather than sorted in with them, so the
+    /// block order the layout pass produced — which already handles multi-column reading
+    /// order — is left intact.
+    /// </summary>
+    private static void AppendPageContent(
+        StringBuilder sb,
+        IReadOnlyList<LayoutBlock> blocks,
+        IReadOnlyList<PageImage> images)
     {
+        var slots = new List<PageImage>[blocks.Count + 1];
+        for (var i = 0; i < slots.Length; i++)
+            slots[i] = new List<PageImage>();
+
+        foreach (var image in images)
+            slots[SlotFor(blocks, image)].Add(image);
+
         var inList = false;
-        foreach (var block in blocks)
+
+        for (var i = 0; i < blocks.Count; i++)
         {
+            if (slots[i].Count > 0)
+            {
+                CloseList(sb, ref inList);
+                AppendImageTags(sb, slots[i]);
+            }
+
+            var block = blocks[i];
             if (block.Tag == "li")
             {
                 if (!inList)
@@ -123,24 +150,51 @@ public sealed class PdfDocumentConverter : IDocumentConverter
                 continue;
             }
 
-            if (inList)
-            {
-                sb.AppendLine("    </ul>");
-                inList = false;
-            }
-
+            CloseList(sb, ref inList);
             sb.Append("    <").Append(block.Tag).Append('>');
             sb.Append(WebUtility.HtmlEncode(block.Text));
             sb.Append("</").Append(block.Tag).AppendLine(">");
         }
 
-        if (inList)
-            sb.AppendLine("    </ul>");
+        CloseList(sb, ref inList);
+        AppendImageTags(sb, slots[blocks.Count]);
     }
 
-    private static void AppendImages(StringBuilder sb, Page page, int pageNumber, List<string> warnings)
+    /// <summary>
+    /// Index of the first block starting at or below the image's top edge. PDF coordinates grow
+    /// upward, so a larger Top means higher on the page.
+    /// </summary>
+    private static int SlotFor(IReadOnlyList<LayoutBlock> blocks, PageImage image)
     {
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            if (blocks[i].Top <= image.Top)
+                return i;
+        }
+
+        return blocks.Count;
+    }
+
+    private static void CloseList(StringBuilder sb, ref bool inList)
+    {
+        if (!inList)
+            return;
+
+        sb.AppendLine("    </ul>");
+        inList = false;
+    }
+
+    private static void AppendImageTags(StringBuilder sb, IReadOnlyList<PageImage> images)
+    {
+        foreach (var image in images)
+            sb.AppendLine(image.Html);
+    }
+
+    private static List<PageImage> CollectImages(Page page, int pageNumber, List<string> warnings)
+    {
+        var images = new List<PageImage>();
         var seen = new HashSet<string>();
+
         foreach (var image in page.GetImages())
         {
             var box = image.BoundingBox;
@@ -161,11 +215,17 @@ public sealed class PdfDocumentConverter : IDocumentConverter
             var base64 = Convert.ToBase64String(bytes);
 
             // Sample dimensions travel with the image so exporters can keep its aspect ratio.
-            sb.AppendLine(
+            var html =
                 $"    <img src=\"data:{mime};base64,{base64}\" " +
                 $"width=\"{image.WidthInSamples}\" height=\"{image.HeightInSamples}\" " +
-                $"alt=\"Image from page {pageNumber}\" />");
+                $"alt=\"Image from page {pageNumber}\" />";
+
+            images.Add(new PageImage(box.Top, html));
         }
+
+        // Top down, so several images on one page keep their on-page order.
+        images.Sort((left, right) => right.Top.CompareTo(left.Top));
+        return images;
     }
 
     private static IEnumerable<string> SplitParagraphs(string text) =>
@@ -215,4 +275,7 @@ public sealed class PdfDocumentConverter : IDocumentConverter
         string Html,
         IReadOnlyList<string> PageMarkers,
         IReadOnlyList<string> Warnings);
+
+    /// <summary><paramref name="Top"/> is the image's upper edge in PDF page coordinates.</summary>
+    private sealed record PageImage(double Top, string Html);
 }

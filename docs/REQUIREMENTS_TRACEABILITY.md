@@ -9,7 +9,7 @@ Mapped to DigiArenas *Senior Full Stack Technical Assessment*.
 | 4.2 | Rule-based conversion (no OCR/AI) | Done | `PdfDocumentConverter` (PdfPig) |
 | 4.2 | Text faithful; images copied as-is | Done | HTML text + embedded `data:` images (PNG, with JPEG passthrough) |
 | 4.2 | Scanned / no text layer → exception | Done | `ScannedDocumentException` → job **Failed** |
-| 4.2 | State output choice in README | Done | PDF → **HTML** intermediate → HTML / Plain Text / DOCX |
+| 4.2 | State output choice in README | Done | PDF → **HTML** intermediate → HTML / DOCX |
 | 4.3 | Configurable size limit (default 2 MB) | Done | `DocumentProcessing:DefaultSizeLimitMb` + UI override |
 | 4.3 | Limit applies to the delivered artifact | Done | `ExportedSizeProbe` — packing measures a real export, not the intermediate |
 | 4.3 | Ordered parts (`part N of M`) | Done | `DocumentPart.SequenceLabel` + filenames |
@@ -26,7 +26,7 @@ Mapped to DigiArenas *Senior Full Stack Technical Assessment*.
 | 4.6 | Angular submit + history | Done | `JobsPageComponent` |
 | 5 | Separation of concerns | Done | Api / Application / Domain / Infrastructure |
 | 5 | Deliberate error handling | Done | Typed `DomainException` + status mapping; cancellation and unexpected errors handled separately |
-| 5 | Automated tests on core logic | Done | 31 tests in `ChopDoc.Tests` |
+| 5 | Automated tests on core logic | Done | 38 tests in `ChopDoc.Tests` |
 | 8 | README setup + assumptions + more time | Done | Root `README.md` |
 
 ## Intentional trade-offs

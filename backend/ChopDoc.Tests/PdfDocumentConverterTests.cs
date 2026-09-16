@@ -31,6 +31,33 @@ public class PdfDocumentConverterTests
         Assert.Contains("Hello ChopDoc", html);
     }
 
+    /// <summary>
+    /// Images used to be appended after all of a page's text, so a document laid out as
+    /// text/image/text came out as text/text/image.
+    /// </summary>
+    [Fact]
+    public async Task ConvertPdfToHtmlAsync_PlacesImagesBetweenTheTextTheySitBetween()
+    {
+        const string top = "TEXT ABOVE THE PICTURE";
+        const string bottom = "TEXT BELOW THE PICTURE";
+
+        await using var stream = new MemoryStream(
+            PdfFixtures.CreateTextPdfWithImageBetweenParagraphs(top, bottom));
+
+        var result = await _sut.ConvertPdfToHtmlAsync(stream);
+        var html = System.Text.Encoding.UTF8.GetString(result.Content);
+
+        Assert.Empty(result.Warnings);
+
+        var topIndex = html.IndexOf(top, StringComparison.Ordinal);
+        var imageIndex = html.IndexOf("<img", StringComparison.Ordinal);
+        var bottomIndex = html.IndexOf(bottom, StringComparison.Ordinal);
+
+        Assert.True(topIndex >= 0 && imageIndex >= 0 && bottomIndex >= 0);
+        Assert.True(topIndex < imageIndex, "image should follow the text above it");
+        Assert.True(imageIndex < bottomIndex, "image should precede the text below it");
+    }
+
     [Fact]
     public async Task ConvertPdfToHtmlAsync_NoTextLayer_ThrowsScannedDocumentException()
     {
@@ -62,8 +89,8 @@ public class HtmlOutputExporterTests
     public void Supports_HtmlTextDocx()
     {
         Assert.True(_sut.Supports(OutputFormat.Html));
-        Assert.True(_sut.Supports(OutputFormat.PlainText));
         Assert.True(_sut.Supports(OutputFormat.Docx));
+        Assert.False(_sut.Supports(OutputFormat.PlainText));
         Assert.False(_sut.Supports(OutputFormat.Markdown));
         Assert.False(_sut.Supports(OutputFormat.Rtf));
     }

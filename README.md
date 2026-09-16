@@ -3,7 +3,7 @@
 Document Conversion & Splitting Service — DigiArenas Senior Full Stack assessment.
 
 **Stack:** Angular 17 + .NET 8 (modular monolith)  
-**Conversion target:** PDF → **HTML** (canonical intermediate), then export to **HTML**, **Plain Text**, or **DOCX** — all three are implemented and selectable in the UI.
+**Conversion target:** PDF → **HTML** (canonical intermediate), then export to **HTML** or **DOCX**.
 
 ---
 
@@ -55,7 +55,7 @@ On startup the app creates SQLite DB + storage under `ChopDoc.Api/App_Data/`.
 
 | Method | URL | Body |
 |--------|-----|------|
-| POST | `/api/jobs` | `multipart/form-data`: `file`, `outputFormat` (`Html` \| `PlainText` \| `Docx`), optional `sizeLimitMb` |
+| POST | `/api/jobs` | `multipart/form-data`: `file`, `outputFormat` (`Html` \| `Docx`), optional `sizeLimitMb` |
 | GET | `/api/jobs` | Job list |
 | GET | `/api/jobs/{id}` | Detail + history + parts |
 | GET | `/api/jobs/{jobId}/parts/{partId}` | Download part |
@@ -82,7 +82,7 @@ cd backend
 dotnet test
 ```
 
-31 tests covering conversion (text / scanned / corrupted), splitting (under / exact / over / unsplittable / empty / export-size-aware), validation (sequence, duplicates, source coverage, exported size), job status transitions, and the pipeline end to end.
+38 tests covering conversion (text / scanned / corrupted / image placement), splitting (under / exact / over / unsplittable / empty / export-size-aware), validation (sequence, duplicates, source coverage, exported size), job status transitions, and the pipeline end to end.
 
 ---
 
@@ -131,7 +131,7 @@ Queued → Converting → Splitting → Validating → Completed
 ## Assumptions
 
 - Input format for this version is **PDF only** (non-PDF uploads are still persisted as **Failed** jobs).
-- **HTML is an intermediate, not the deliverable.** One conversion feeds three exporters (HTML / Plain Text / DOCX) behind `IOutputExporter`, so splitting and validation logic is written once.
+- **HTML is an intermediate, not the deliverable.** One conversion feeds the HTML and DOCX exporters behind `IOutputExporter`, so splitting and validation logic is written once.
 - Requests that are malformed at the edge (no file, size limit ≤ 0) are rejected with **HTTP 400** and no job record. Requests that are well-formed but cannot be processed (non-PDF, unsupported format, scanned, corrupted) are persisted as **Failed** jobs so they appear in history.
 - Processing is **synchronous** inside the API request for a reliable live demo.
 - “Scanned” is detected as **no extractable text layer** across the whole document (sample `scanned-no-text-sample.pdf` exercises that rule).

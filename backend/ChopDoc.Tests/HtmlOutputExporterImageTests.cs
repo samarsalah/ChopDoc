@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using ChopDoc.Domain.Enums;
+using ChopDoc.Domain.Exceptions;
 using ChopDoc.Infrastructure.Export;
 using DocumentFormat.OpenXml.Packaging;
 
@@ -113,19 +114,16 @@ public class HtmlOutputExporterImageTests
     }
 
     [Fact]
-    public void Export_PlainText_MarksImagePositionsInsteadOfDroppingThem()
+    public void Export_PlainText_IsNotSupported()
     {
-        var result = _sut.Export(
-            Encoding.UTF8.GetBytes(HtmlWithImages(2)),
-            "sample",
-            1,
-            1,
-            OutputFormat.PlainText);
-
-        var text = Encoding.UTF8.GetString(result.Content);
-
-        Assert.Equal(2, Regex.Matches(text, Regex.Escape("[image]")).Count);
-        Assert.Contains("Body text", text);
+        Assert.False(_sut.Supports(OutputFormat.PlainText));
+        Assert.Throws<UnsupportedOutputFormatException>(() =>
+            _sut.Export(
+                Encoding.UTF8.GetBytes(HtmlWithImages(1)),
+                "sample",
+                1,
+                1,
+                OutputFormat.PlainText));
     }
 
     [Fact]

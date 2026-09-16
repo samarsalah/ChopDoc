@@ -4,12 +4,12 @@
 
 - The assessment allows DOCX or a structured HTML/text target. We produce all three, but only convert once.
 - HTML gives splitting and validation something deterministic to work with: page sections carry a `data-chopdoc-marker`, so parts can be packed, counted, and checked for loss or duplication.
-- Adding a format is a new `IOutputExporter`, not a second pipeline. DOCX and plain text are both exporters over the same HTML.
+- Adding a format is a new `IOutputExporter`, not a second pipeline. DOCX is an exporter over the same HTML.
 - Still rule-based: PdfPig text extraction plus images copied across untouched. No OCR.
 
 ## Where the size limit is enforced
 
-The limit belongs to the artifact that gets handed off, so measuring the HTML intermediate would be measuring the wrong thing — plain text and DOCX are usually far smaller, and judging by the HTML would split documents that would have fit in one part.
+The limit belongs to the artifact that gets handed off, so measuring the HTML intermediate would be measuring the wrong thing — DOCX is usually smaller, and judging by the HTML would split documents that would have fit in one part.
 
 - `MarkedDocumentSplitter` receives an `ExportedSizeProbe` and sizes every candidate part with a real export.
 - `DocumentJobService` exports into memory, then validates, then writes. Validation therefore runs against the delivered bytes, and a validation failure leaves nothing in storage.

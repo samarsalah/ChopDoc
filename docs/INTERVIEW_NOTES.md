@@ -2,7 +2,7 @@
 
 ## 30-second pitch
 
-ChopDoc is a modular monolith: Angular submits a PDF job; a .NET API orchestrates convert → split → export → validate; every status is persisted with history. Conversion is PdfPig PDF→HTML, rule-based, no OCR. HTML is an intermediate — one conversion feeds HTML, plain text, and DOCX exporters. Parts are sized against the exported format and validated before a job can be marked Completed.
+ChopDoc is a modular monolith: Angular submits a PDF job; a .NET API orchestrates convert → split → export → validate; every status is persisted with history. Conversion is PdfPig PDF→HTML, rule-based, no OCR. HTML is an intermediate — one conversion feeds HTML and DOCX exporters. Parts are sized against the exported format and validated before a job can be marked Completed.
 
 ## Questions they may ask
 

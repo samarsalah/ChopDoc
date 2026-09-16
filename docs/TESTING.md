@@ -7,7 +7,7 @@ cd backend
 dotnet test
 ```
 
-Expected: **31 tests passed** (conversion, splitting, validation, job status, pipeline).
+Expected: **38 tests passed** (conversion, splitting, validation, job status, export, pipeline).
 
 What they prove:
 
@@ -51,7 +51,7 @@ npm start
 | 4 | Upload a `.txt` renamed or non-PDF | **Failed** job persisted (`UNSUPPORTED_OR_CORRUPTED_INPUT`) |
 | 5 | Submit with output format `Rtf` (via API) | **Failed** job (`UNSUPPORTED_OUTPUT_FORMAT`) |
 | 6 | Click a past job in history | Detail shows timeline + downloads when completed |
-| 7 | Same large PDF at limit `2`, once as **HTML** and once as **Plain Text** | The limit follows the delivered format, so part counts can differ |
+| 7 | Same large PDF at limit `2`, once as **HTML** and once as **DOCX** | The limit follows the delivered format, so part counts can differ |
 
 ### Force splitting tip
 

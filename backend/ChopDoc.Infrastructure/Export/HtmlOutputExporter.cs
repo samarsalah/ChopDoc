@@ -16,7 +16,7 @@ namespace ChopDoc.Infrastructure.Export;
 
 /// <summary>
 /// Exports HTML parts (after split/validate) to the requested user format.
-/// Supported: Html, PlainText, Docx.
+/// Supported: Html, Docx.
 /// </summary>
 public sealed class HtmlOutputExporter : IOutputExporter
 {
@@ -44,7 +44,6 @@ public sealed class HtmlOutputExporter : IOutputExporter
 
     public bool Supports(OutputFormat format) =>
         format is OutputFormat.Html
-            or OutputFormat.PlainText
             or OutputFormat.Docx;
 
     public ExportResult Export(
@@ -69,11 +68,6 @@ public sealed class HtmlOutputExporter : IOutputExporter
                 fileName,
                 "text/html; charset=utf-8",
                 ".html"),
-            OutputFormat.PlainText => new ExportResult(
-                Encoding.UTF8.GetBytes(ToPlainText(Encoding.UTF8.GetString(htmlContent))),
-                fileName,
-                "text/plain; charset=utf-8",
-                ".txt"),
             OutputFormat.Docx => new ExportResult(
                 ToDocx(Encoding.UTF8.GetString(htmlContent)),
                 fileName,
@@ -86,35 +80,9 @@ public sealed class HtmlOutputExporter : IOutputExporter
     private static string ExtensionFor(OutputFormat format) => format switch
     {
         OutputFormat.Html => ".html",
-        OutputFormat.PlainText => ".txt",
         OutputFormat.Docx => ".docx",
         _ => ".bin"
     };
-
-    private static string ToPlainText(string html)
-    {
-        var sb = new StringBuilder();
-        foreach (Match match in ContentRegex.Matches(html))
-        {
-            if (match.Groups["data"].Success)
-            {
-                // Plain text cannot carry an image, so mark where one was rather than losing it.
-                sb.AppendLine("[image]");
-                continue;
-            }
-
-            var text = Decode(match.Groups["text"].Value);
-            if (text.Length == 0)
-                continue;
-
-            if (match.Groups["tag"].Value.Equals("li", StringComparison.OrdinalIgnoreCase))
-                sb.Append("• ");
-
-            sb.AppendLine(text);
-        }
-
-        return sb.ToString().Trim() + Environment.NewLine;
-    }
 
     private static byte[] ToDocx(string html)
     {

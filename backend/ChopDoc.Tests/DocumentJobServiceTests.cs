@@ -20,7 +20,7 @@ public class DocumentJobServiceTests
 {
     /// <summary>
     /// The size limit applies to the delivered file. This document's HTML intermediate is over
-    /// the limit while its plain-text export is comfortably under, so it must not be split.
+    /// the limit while its DOCX export is under, so it must not be split.
     /// </summary>
     [Fact]
     public async Task SubmitAsync_WhenExportedOutputFitsLimit_ProducesSinglePart()
@@ -29,7 +29,7 @@ public class DocumentJobServiceTests
         var (limitMb, intermediateBytes, exportedBytes) = await SizeLimitBetweenIntermediateAndExport(pdf);
         Assert.True(exportedBytes < intermediateBytes);
 
-        var result = await Submit(pdf, "PlainText", limitMb);
+        var result = await Submit(pdf, "Docx", limitMb);
 
         Assert.Equal(nameof(JobStatus.Completed), result.Status);
         Assert.Single(result.Parts);
@@ -82,8 +82,8 @@ public class DocumentJobServiceTests
             .ToArray();
 
     /// <summary>
-    /// Picks a limit that sits between the HTML intermediate and the exported text, which is the
-    /// only window where the two sizing rules disagree.
+    /// Picks a limit that sits between the HTML intermediate and the DOCX export, which is the
+    /// window where the two sizing rules disagree.
     /// </summary>
     private static async Task<(double LimitMb, long IntermediateBytes, long ExportedBytes)>
         SizeLimitBetweenIntermediateAndExport(byte[] pdf)
@@ -91,7 +91,7 @@ public class DocumentJobServiceTests
         await using var stream = new MemoryStream(pdf);
         var converted = await new PdfDocumentConverter().ConvertPdfToHtmlAsync(stream);
         var exported = new HtmlOutputExporter()
-            .Export(converted.Content, "doc", 1, 1, OutputFormat.PlainText)
+            .Export(converted.Content, "doc", 1, 1, OutputFormat.Docx)
             .Content.LongLength;
 
         var intermediate = converted.Content.LongLength;

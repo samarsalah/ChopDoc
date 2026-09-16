@@ -1,7 +1,7 @@
 namespace ChopDoc.Domain.Enums;
 
 /// <summary>
-/// Conversion targets. HTML / PlainText / Docx are implemented.
+/// Conversion targets. HTML / Docx are implemented.
 /// Other values are selectable so unsupported-format handling is visible end-to-end (OCP-ready).
 /// </summary>
 public enum OutputFormat

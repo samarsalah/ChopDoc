@@ -158,7 +158,14 @@ internal static class PdfPageLayout
 
         var blocks = new List<LayoutBlock>();
         var paragraph = new List<string>();
+
+        // Vertical span of the lines making up the block being accumulated, so the converter
+        // can place images among the text by position.
+        var paragraphTop = double.MinValue;
+        var paragraphBottom = double.MaxValue;
         string? bullet = null;
+        var bulletTop = double.MinValue;
+        var bulletBottom = double.MaxValue;
         double bulletIndent = 0;
         double? previousBottom = null;
         double? previousLeft = null;
@@ -168,8 +175,10 @@ internal static class PdfPageLayout
             if (paragraph.Count == 0)
                 return;
 
-            blocks.Add(new LayoutBlock("p", string.Join(" ", paragraph)));
+            blocks.Add(new LayoutBlock("p", string.Join(" ", paragraph), paragraphTop, paragraphBottom));
             paragraph.Clear();
+            paragraphTop = double.MinValue;
+            paragraphBottom = double.MaxValue;
         }
 
         void FlushBullet()
@@ -177,8 +186,10 @@ internal static class PdfPageLayout
             if (bullet is null)
                 return;
 
-            blocks.Add(new LayoutBlock("li", bullet));
+            blocks.Add(new LayoutBlock("li", bullet, bulletTop, bulletBottom));
             bullet = null;
+            bulletTop = double.MinValue;
+            bulletBottom = double.MaxValue;
         }
 
         foreach (var line in lines)
@@ -192,7 +203,7 @@ internal static class PdfPageLayout
             {
                 FlushBullet();
                 FlushParagraph();
-                blocks.Add(new LayoutBlock("h3", text));
+                blocks.Add(new LayoutBlock("h3", text, line.Top, line.Bottom));
                 previousBottom = line.Bottom;
                 previousLeft = line.Left;
                 continue;
@@ -203,6 +214,8 @@ internal static class PdfPageLayout
                 FlushParagraph();
                 FlushBullet();
                 bullet = StripBullet(text);
+                bulletTop = line.Top;
+                bulletBottom = line.Bottom;
                 bulletIndent = line.Left;
                 previousBottom = line.Bottom;
                 previousLeft = line.Left;
@@ -215,6 +228,8 @@ internal static class PdfPageLayout
             if (bullet is not null && gap >= 0 && gap <= paragraphGap && sameColumn)
             {
                 bullet = bullet + " " + text;
+                bulletTop = Math.Max(bulletTop, line.Top);
+                bulletBottom = Math.Min(bulletBottom, line.Bottom);
                 previousBottom = line.Bottom;
                 previousLeft = line.Left;
                 continue;
@@ -226,6 +241,8 @@ internal static class PdfPageLayout
                 FlushParagraph();
 
             paragraph.Add(text);
+            paragraphTop = Math.Max(paragraphTop, line.Top);
+            paragraphBottom = Math.Min(paragraphBottom, line.Bottom);
             previousBottom = line.Bottom;
             previousLeft = line.Left;
         }
@@ -281,4 +298,4 @@ internal static class PdfPageLayout
     }
 }
 
-internal readonly record struct LayoutBlock(string Tag, string Text);
+internal readonly record struct LayoutBlock(string Tag, string Text, double Top, double Bottom);
