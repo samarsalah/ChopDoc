@@ -55,12 +55,12 @@ public class HtmlOutputExporterTests
     private readonly ChopDoc.Infrastructure.Export.HtmlOutputExporter _sut = new();
 
     [Fact]
-    public void Supports_HtmlTextMarkdownDocx()
+    public void Supports_HtmlTextDocx()
     {
         Assert.True(_sut.Supports(OutputFormat.Html));
         Assert.True(_sut.Supports(OutputFormat.PlainText));
-        Assert.True(_sut.Supports(OutputFormat.Markdown));
         Assert.True(_sut.Supports(OutputFormat.Docx));
+        Assert.False(_sut.Supports(OutputFormat.Markdown));
         Assert.False(_sut.Supports(OutputFormat.Rtf));
     }
 

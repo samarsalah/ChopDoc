@@ -30,7 +30,6 @@ export class JobsPageComponent implements OnInit {
   readonly outputFormats = [
     { value: 'Html', label: 'HTML' },
     { value: 'PlainText', label: 'Plain Text' },
-    { value: 'Markdown', label: 'Markdown' },
     { value: 'Docx', label: 'DOCX' }
   ];
 
@@ -40,7 +39,7 @@ export class JobsPageComponent implements OnInit {
     { key: 'Converting', label: 'Convert', hint: 'PDF → HTML intermediate' },
     { key: 'Splitting', label: 'Split', hint: 'Break oversize output into parts' },
     { key: 'Validating', label: 'Validate', hint: 'Check parts are complete' },
-    { key: 'Completed', label: 'Export', hint: 'Write HTML / Text / Markdown / DOCX' }
+    { key: 'Completed', label: 'Export', hint: 'Write HTML / Text / DOCX' }
   ];
 
   submitting = false;

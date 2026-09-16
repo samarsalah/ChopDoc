@@ -16,16 +16,12 @@ namespace ChopDoc.Infrastructure.Export;
 
 /// <summary>
 /// Exports HTML parts (after split/validate) to the requested user format.
-/// Supported: Html, PlainText, Markdown, Docx.
+/// Supported: Html, PlainText, Docx.
 /// </summary>
 public sealed class HtmlOutputExporter : IOutputExporter
 {
-    private static readonly Regex ParagraphRegex = new(
-        @"<p[^>]*>(?<text>[\s\S]*?)</p>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private static readonly Regex HeadingRegex = new(
-        @"<h2[^>]*>(?<text>[\s\S]*?)</h2>",
+    private static readonly Regex BlockRegex = new(
+        @"<(?<tag>h1|h2|h3|p|li)\b[^>]*>(?<text>[\s\S]*?)</\k<tag>>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex ImageRegex = new(
@@ -37,7 +33,6 @@ public sealed class HtmlOutputExporter : IOutputExporter
     public bool Supports(OutputFormat format) =>
         format is OutputFormat.Html
             or OutputFormat.PlainText
-            or OutputFormat.Markdown
             or OutputFormat.Docx;
 
     public ExportResult Export(
@@ -67,11 +62,6 @@ public sealed class HtmlOutputExporter : IOutputExporter
                 fileName,
                 "text/plain; charset=utf-8",
                 ".txt"),
-            OutputFormat.Markdown => new ExportResult(
-                Encoding.UTF8.GetBytes(ToMarkdown(Encoding.UTF8.GetString(htmlContent))),
-                fileName,
-                "text/markdown; charset=utf-8",
-                ".md"),
             OutputFormat.Docx => new ExportResult(
                 ToDocx(Encoding.UTF8.GetString(htmlContent)),
                 fileName,
@@ -85,7 +75,6 @@ public sealed class HtmlOutputExporter : IOutputExporter
     {
         OutputFormat.Html => ".html",
         OutputFormat.PlainText => ".txt",
-        OutputFormat.Markdown => ".md",
         OutputFormat.Docx => ".docx",
         _ => ".bin"
     };
@@ -93,40 +82,19 @@ public sealed class HtmlOutputExporter : IOutputExporter
     private static string ToPlainText(string html)
     {
         var sb = new StringBuilder();
-        foreach (Match h in HeadingRegex.Matches(html))
-            sb.AppendLine(Decode(h.Groups["text"].Value));
+        foreach (Match block in BlockRegex.Matches(html))
+        {
+            var text = Decode(block.Groups["text"].Value);
+            if (text.Length == 0)
+                continue;
 
-        foreach (Match p in ParagraphRegex.Matches(html))
-            sb.AppendLine(Decode(p.Groups["text"].Value));
+            if (block.Groups["tag"].Value.Equals("li", StringComparison.OrdinalIgnoreCase))
+                sb.Append("• ");
+
+            sb.AppendLine(text);
+        }
 
         return sb.ToString().Trim() + Environment.NewLine;
-    }
-
-    private static string ToMarkdown(string html)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine("# Converted document");
-        sb.AppendLine();
-
-        foreach (Match h in HeadingRegex.Matches(html))
-        {
-            sb.Append("## ").AppendLine(Decode(h.Groups["text"].Value));
-            sb.AppendLine();
-        }
-
-        foreach (Match p in ParagraphRegex.Matches(html))
-        {
-            sb.AppendLine(Decode(p.Groups["text"].Value));
-            sb.AppendLine();
-        }
-
-        foreach (Match img in ImageRegex.Matches(html))
-        {
-            sb.Append("![embedded image](").Append(img.Groups["src"].Value).AppendLine(")");
-            sb.AppendLine();
-        }
-
-        return sb.ToString();
     }
 
     private static byte[] ToDocx(string html)
@@ -138,14 +106,20 @@ public sealed class HtmlOutputExporter : IOutputExporter
             mainPart.Document = new Document(new Body());
             var body = mainPart.Document.Body!;
 
-            foreach (Match h in HeadingRegex.Matches(html))
+            foreach (Match block in BlockRegex.Matches(html))
             {
-                body.AppendChild(CreateParagraph(Decode(h.Groups["text"].Value), bold: true, fontSize: "28"));
-            }
+                var tag = block.Groups["tag"].Value.ToLowerInvariant();
+                var text = Decode(block.Groups["text"].Value);
+                if (text.Length == 0)
+                    continue;
 
-            foreach (Match p in ParagraphRegex.Matches(html))
-            {
-                body.AppendChild(CreateParagraph(Decode(p.Groups["text"].Value)));
+                body.AppendChild(tag switch
+                {
+                    "h1" or "h2" => CreateParagraph(text, bold: true, fontSize: "28"),
+                    "h3" => CreateParagraph(text, bold: true, fontSize: "24"),
+                    "li" => CreateParagraph("• " + text),
+                    _ => CreateParagraph(text)
+                });
             }
 
             var imageIndex = 0;

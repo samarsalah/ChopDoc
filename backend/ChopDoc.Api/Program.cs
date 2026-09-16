@@ -12,7 +12,7 @@ builder.Services.AddSwaggerGen(options =>
         Version = "v1",
         Description =
             "Document conversion & splitting service.\n\n" +
-            "Pipeline: PDF → HTML (intermediate) → split/validate → export (HTML / Text / Markdown / DOCX)."
+            "Pipeline: PDF → HTML (intermediate) → split/validate → export (HTML / Text / DOCX)."
     });
 });
 builder.Services.AddInfrastructure(builder.Configuration);

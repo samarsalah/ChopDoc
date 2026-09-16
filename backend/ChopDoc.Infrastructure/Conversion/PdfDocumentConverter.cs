@@ -11,6 +11,7 @@ namespace ChopDoc.Infrastructure.Conversion;
 
 /// <summary>
 /// Rule-based PDF → HTML (canonical intermediate). No OCR.
+/// Text is rebuilt from word positions so columns and line wraps are not smashed together.
 /// </summary>
 public sealed class PdfDocumentConverter : IDocumentConverter
 {
@@ -69,25 +70,26 @@ public sealed class PdfDocumentConverter : IDocumentConverter
             sb.AppendLine($"  <section {HtmlMarkerAttribute}=\"{marker}\">");
             sb.AppendLine($"    <h2>Page {i + 1}</h2>");
 
-            var text = page.Text?.Trim();
-            if (!string.IsNullOrEmpty(text))
+            var blocks = PdfPageLayout.ExtractBlocks(page);
+            if (blocks.Count == 0)
             {
-                foreach (var paragraph in SplitParagraphs(text))
+                var text = page.Text?.Trim();
+                if (!string.IsNullOrEmpty(text))
                 {
-                    sb.Append("    <p>");
-                    sb.Append(WebUtility.HtmlEncode(paragraph));
-                    sb.AppendLine("</p>");
+                    foreach (var paragraph in SplitParagraphs(text))
+                    {
+                        sb.Append("    <p>");
+                        sb.Append(WebUtility.HtmlEncode(paragraph));
+                        sb.AppendLine("</p>");
+                    }
                 }
             }
-
-            foreach (var image in page.GetImages())
+            else
             {
-                if (!TryGetImageBytes(image, out var bytes, out var mime))
-                    continue;
-
-                var base64 = Convert.ToBase64String(bytes);
-                sb.AppendLine($"    <img src=\"data:{mime};base64,{base64}\" alt=\"Embedded image from page {i + 1}\" />");
+                AppendBlocks(sb, blocks);
             }
+
+            AppendImages(sb, page, i + 1);
 
             sb.AppendLine("  </section>");
         }
@@ -95,6 +97,61 @@ public sealed class PdfDocumentConverter : IDocumentConverter
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");
         return sb.ToString();
+    }
+
+    private static void AppendBlocks(StringBuilder sb, IReadOnlyList<LayoutBlock> blocks)
+    {
+        var inList = false;
+        foreach (var block in blocks)
+        {
+            if (block.Tag == "li")
+            {
+                if (!inList)
+                {
+                    sb.AppendLine("    <ul>");
+                    inList = true;
+                }
+
+                sb.Append("      <li>");
+                sb.Append(WebUtility.HtmlEncode(block.Text));
+                sb.AppendLine("</li>");
+                continue;
+            }
+
+            if (inList)
+            {
+                sb.AppendLine("    </ul>");
+                inList = false;
+            }
+
+            sb.Append("    <").Append(block.Tag).Append('>');
+            sb.Append(WebUtility.HtmlEncode(block.Text));
+            sb.Append("</").Append(block.Tag).AppendLine(">");
+        }
+
+        if (inList)
+            sb.AppendLine("    </ul>");
+    }
+
+    private static void AppendImages(StringBuilder sb, Page page, int pageNumber)
+    {
+        var seen = new HashSet<string>();
+        foreach (var image in page.GetImages())
+        {
+            var box = image.BoundingBox;
+            if (box.Width < 24 && box.Height < 24)
+                continue;
+
+            var key = $"{Math.Round(box.Left)}:{Math.Round(box.Bottom)}:{Math.Round(box.Width)}:{Math.Round(box.Height)}";
+            if (!seen.Add(key))
+                continue;
+
+            if (!TryGetImageBytes(image, out var bytes, out var mime))
+                continue;
+
+            var base64 = Convert.ToBase64String(bytes);
+            sb.AppendLine($"    <img src=\"data:{mime};base64,{base64}\" alt=\"Image from page {pageNumber}\" />");
+        }
     }
 
     private static IEnumerable<string> SplitParagraphs(string text) =>
@@ -113,13 +170,6 @@ public sealed class PdfDocumentConverter : IDocumentConverter
             {
                 bytes = png;
                 mime = "image/png";
-                return true;
-            }
-
-            if (!image.RawBytes.IsEmpty)
-            {
-                bytes = image.RawBytes.ToArray();
-                mime = "application/octet-stream";
                 return true;
             }
         }

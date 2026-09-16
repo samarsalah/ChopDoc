@@ -3,7 +3,7 @@
 Document Conversion & Splitting Service — DigiArenas Senior Full Stack assessment.
 
 **Stack:** Angular 17 + .NET 8 (modular monolith)  
-**Conversion target:** PDF → **HTML** (canonical intermediate), then export to HTML / Plain Text / Markdown / **DOCX**
+**Conversion target:** PDF → **HTML** (canonical intermediate), then export to HTML / Plain Text / **DOCX**
 
 ---
 

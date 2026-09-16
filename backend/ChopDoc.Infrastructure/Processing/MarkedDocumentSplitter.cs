@@ -21,7 +21,7 @@ public sealed class MarkedDocumentSplitter : IDocumentSplitter
 
     /// <summary>Headings, paragraphs, and images as atomic split units.</summary>
     private static readonly Regex HtmlAtomRegex = new(
-        @"<img\b[^>]*>|<(?<tag>h1|h2|h3|p)\b[^>]*>[\s\S]*?</\k<tag>>",
+        @"<img\b[^>]*>|<(?<tag>h1|h2|h3|p|li)\b[^>]*>[\s\S]*?</\k<tag>>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public IReadOnlyList<SplitPartContent> SplitIfNeeded(
