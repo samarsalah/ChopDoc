@@ -90,18 +90,16 @@ dotnet test
 
 | File | Expected behaviour |
 |------|--------------------|
-| `samples/text-sample.pdf` | Converts successfully |
-| `samples/multipage-text-sample.pdf` | Converts; may split if size limit is low |
-| `samples/scanned-no-text-sample.pdf` | Fails with `SCANNED_DOCUMENT` (no text layer) |
+| `samples/text-with-images.pdf` | Converts successfully (text plus an embedded image) |
+| `samples/scanned-no-text-sample.pdf` | Fails with `SCANNED_DOCUMENT` (image only, no text layer) |
+| `samples/large-over-2mb.pdf` | Larger than 2 MB; splits at the default 2 MB limit |
 
-Regenerate samples:
+Regenerate the large sample:
 
 ```bash
 cd backend/tools/GenerateSamples
 dotnet run -- ../../../samples
 ```
-
-Tip: set size limit to `0.01` MB in the UI to force splitting on multipage output.
 
 ---
 
