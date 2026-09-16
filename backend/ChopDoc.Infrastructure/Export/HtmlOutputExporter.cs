@@ -20,15 +20,27 @@ namespace ChopDoc.Infrastructure.Export;
 /// </summary>
 public sealed class HtmlOutputExporter : IOutputExporter
 {
-    private static readonly Regex BlockRegex = new(
-        @"<(?<tag>h1|h2|h3|p|li)\b[^>]*>(?<text>[\s\S]*?)</\k<tag>>",
+    /// <summary>
+    /// Block elements and images in a single pattern so they are exported in document order,
+    /// instead of carrying the text across first and appending every image at the end.
+    /// </summary>
+    private static readonly Regex ContentRegex = new(
+        @"<img\b[^>]*src\s*=\s*""data:(?<mime>[^;]+);base64,(?<data>[^""]+)""[^>]*>"
+        + @"|<(?<tag>h1|h2|h3|p|li)\b[^>]*>(?<text>[\s\S]*?)</\k<tag>>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex ImageRegex = new(
-        @"<img[^>]*src\s*=\s*""(?<src>data:(?<mime>[^;]+);base64,(?<data>[^""]+))""[^>]*>",
+    private static readonly Regex ImageWidthRegex = new(
+        @"\bwidth\s*=\s*""(?<value>\d+)""",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex ImageHeightRegex = new(
+        @"\bheight\s*=\s*""(?<value>\d+)""",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex TagRegex = new("<.*?>", RegexOptions.Singleline | RegexOptions.Compiled);
+
+    /// <summary>Rendered image width: 6 inches at 914400 EMU per inch.</summary>
+    private const long RenderedImageWidthEmu = 5_486_400;
 
     public bool Supports(OutputFormat format) =>
         format is OutputFormat.Html
@@ -82,13 +94,20 @@ public sealed class HtmlOutputExporter : IOutputExporter
     private static string ToPlainText(string html)
     {
         var sb = new StringBuilder();
-        foreach (Match block in BlockRegex.Matches(html))
+        foreach (Match match in ContentRegex.Matches(html))
         {
-            var text = Decode(block.Groups["text"].Value);
+            if (match.Groups["data"].Success)
+            {
+                // Plain text cannot carry an image, so mark where one was rather than losing it.
+                sb.AppendLine("[image]");
+                continue;
+            }
+
+            var text = Decode(match.Groups["text"].Value);
             if (text.Length == 0)
                 continue;
 
-            if (block.Groups["tag"].Value.Equals("li", StringComparison.OrdinalIgnoreCase))
+            if (match.Groups["tag"].Value.Equals("li", StringComparison.OrdinalIgnoreCase))
                 sb.Append("• ");
 
             sb.AppendLine(text);
@@ -105,15 +124,23 @@ public sealed class HtmlOutputExporter : IOutputExporter
             var mainPart = word.AddMainDocumentPart();
             mainPart.Document = new Document(new Body());
             var body = mainPart.Document.Body!;
+            var imageCount = 0u;
 
-            foreach (Match block in BlockRegex.Matches(html))
+            foreach (Match match in ContentRegex.Matches(html))
             {
-                var tag = block.Groups["tag"].Value.ToLowerInvariant();
-                var text = Decode(block.Groups["text"].Value);
+                if (match.Groups["data"].Success)
+                {
+                    if (TryAppendImage(mainPart, body, match, imageCount + 1))
+                        imageCount++;
+
+                    continue;
+                }
+
+                var text = Decode(match.Groups["text"].Value);
                 if (text.Length == 0)
                     continue;
 
-                body.AppendChild(tag switch
+                body.AppendChild(match.Groups["tag"].Value.ToLowerInvariant() switch
                 {
                     "h1" or "h2" => CreateParagraph(text, bold: true, fontSize: "28"),
                     "h3" => CreateParagraph(text, bold: true, fontSize: "24"),
@@ -122,34 +149,56 @@ public sealed class HtmlOutputExporter : IOutputExporter
                 });
             }
 
-            var imageIndex = 0;
-            foreach (Match img in ImageRegex.Matches(html))
-            {
-                try
-                {
-                    var bytes = Convert.FromBase64String(img.Groups["data"].Value);
-                    var mime = img.Groups["mime"].Value.ToLowerInvariant();
-                    var imagePartType = mime.Contains("jpeg") || mime.Contains("jpg")
-                        ? ImagePartType.Jpeg
-                        : ImagePartType.Png;
-
-                    var imagePart = mainPart.AddImagePart(imagePartType);
-                    using (var ms = new MemoryStream(bytes))
-                        imagePart.FeedData(ms);
-
-                    var relationshipId = mainPart.GetIdOfPart(imagePart);
-                    body.AppendChild(CreateImageParagraph(relationshipId, $"image{imageIndex++}"));
-                }
-                catch
-                {
-                    // Skip undecodable images; text content still exported.
-                }
-            }
-
             mainPart.Document.Save();
         }
 
         return stream.ToArray();
+    }
+
+    private static bool TryAppendImage(MainDocumentPart mainPart, Body body, Match image, uint imageId)
+    {
+        try
+        {
+            var bytes = Convert.FromBase64String(image.Groups["data"].Value);
+            var mime = image.Groups["mime"].Value.ToLowerInvariant();
+            var imagePartType = mime.Contains("jpeg") || mime.Contains("jpg")
+                ? ImagePartType.Jpeg
+                : ImagePartType.Png;
+
+            var imagePart = mainPart.AddImagePart(imagePartType);
+            using (var content = new MemoryStream(bytes))
+                imagePart.FeedData(content);
+
+            body.AppendChild(CreateImageParagraph(
+                mainPart.GetIdOfPart(imagePart),
+                imageId,
+                RenderedExtent(image.Value)));
+
+            return true;
+        }
+        catch
+        {
+            // Skip undecodable images; text content still exported.
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Renders at a fixed width and derives the height from the source dimensions the converter
+    /// recorded, so a portrait image is not stretched into a landscape box.
+    /// </summary>
+    private static (long Cx, long Cy) RenderedExtent(string imageTag)
+    {
+        var width = ImageWidthRegex.Match(imageTag).Groups["value"].Value;
+        var height = ImageHeightRegex.Match(imageTag).Groups["value"].Value;
+
+        if (!int.TryParse(width, out var samplesWide) || samplesWide <= 0 ||
+            !int.TryParse(height, out var samplesHigh) || samplesHigh <= 0)
+        {
+            return (RenderedImageWidthEmu, RenderedImageWidthEmu * 3 / 4);
+        }
+
+        return (RenderedImageWidthEmu, (long)(RenderedImageWidthEmu * (samplesHigh / (double)samplesWide)));
     }
 
     private static Paragraph CreateParagraph(string text, bool bold = false, string fontSize = "22")
@@ -162,24 +211,26 @@ public sealed class HtmlOutputExporter : IOutputExporter
             new Run(runProps, new Text(text)));
     }
 
-    private static Paragraph CreateImageParagraph(string relationshipId, string name)
+    private static Paragraph CreateImageParagraph(string relationshipId, uint imageId, (long Cx, long Cy) extent)
     {
-        long cx = 4572000;
-        long cy = 2571750;
+        // Word treats a document where two drawings share a docPr id as corrupt, so every
+        // image needs its own.
+        var name = $"Image {imageId}";
+        var (cx, cy) = extent;
 
         var element =
             new Drawing(
                 new DW.Inline(
                     new DW.Extent { Cx = cx, Cy = cy },
                     new DW.EffectExtent { LeftEdge = 0L, TopEdge = 0L, RightEdge = 0L, BottomEdge = 0L },
-                    new DW.DocProperties { Id = (UInt32Value)1U, Name = name },
+                    new DW.DocProperties { Id = imageId, Name = name },
                     new DW.NonVisualGraphicFrameDrawingProperties(
                         new A.GraphicFrameLocks { NoChangeAspect = true }),
                     new A.Graphic(
                         new A.GraphicData(
                             new PIC.Picture(
                                 new PIC.NonVisualPictureProperties(
-                                    new PIC.NonVisualDrawingProperties { Id = 0U, Name = name },
+                                    new PIC.NonVisualDrawingProperties { Id = imageId, Name = name },
                                     new PIC.NonVisualPictureDrawingProperties()),
                                 new PIC.BlipFill(
                                     new A.Blip { Embed = relationshipId },

@@ -159,7 +159,12 @@ public sealed class PdfDocumentConverter : IDocumentConverter
             }
 
             var base64 = Convert.ToBase64String(bytes);
-            sb.AppendLine($"    <img src=\"data:{mime};base64,{base64}\" alt=\"Image from page {pageNumber}\" />");
+
+            // Sample dimensions travel with the image so exporters can keep its aspect ratio.
+            sb.AppendLine(
+                $"    <img src=\"data:{mime};base64,{base64}\" " +
+                $"width=\"{image.WidthInSamples}\" height=\"{image.HeightInSamples}\" " +
+                $"alt=\"Image from page {pageNumber}\" />");
         }
     }
 
