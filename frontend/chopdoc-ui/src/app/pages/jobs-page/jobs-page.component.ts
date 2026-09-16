@@ -160,6 +160,12 @@ export class JobsPageComponent implements OnInit {
 
   formatDate(value: string | null | undefined): string {
     if (!value) return '—';
-    return new Date(value).toLocaleString();
+
+    // API timestamps are UTC. A missing offset must not be read as local time.
+    const hasOffset = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
+    const date = new Date(hasOffset ? value : `${value}Z`);
+    if (Number.isNaN(date.getTime())) return value;
+
+    return date.toLocaleString();
   }
 }
