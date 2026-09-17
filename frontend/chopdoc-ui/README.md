@@ -1,27 +1,40 @@
-# ChopdocUi
+# ChopDoc UI
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 17.0.9.
+Angular 17 frontend for ChopDoc: submit a PDF conversion job, choose the output format and size limit, and browse job history with each job's status timeline and downloadable parts.
 
-## Development server
+Generated with Angular CLI 17.0.9.
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+## Run
 
-## Code scaffolding
+```bash
+npm install
+npm start
+```
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+UI: http://localhost:4200 — expects the API on http://localhost:5105 (see `src/environments/environment.ts`). Start the backend first: `cd ../../backend/ChopDoc.Api && dotnet run --launch-profile http`.
 
 ## Build
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+```bash
+npm run build      # artifacts in dist/
+```
 
-## Running unit tests
+The production environment (`environment.prod.ts`) points at `/api`, assuming the UI is served behind the same origin as the API.
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+## Tests
 
-## Running end-to-end tests
+```bash
+npm test           # ng test (Karma + Jasmine)
+```
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+The core logic under test lives in the backend — see [`docs/TESTING.md`](../../docs/TESTING.md) for the full test plan and the manual demo scenarios.
 
-## Further help
+## Where things are
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+| Path | Purpose |
+|------|---------|
+| `src/app/pages/jobs-page` | Submit form, job list, job detail with status timeline |
+| `src/app/services/job.service.ts` | API calls and part download URLs |
+| `src/environments` | API base URL per configuration |
+
+See the [root README](../../README.md) for the full solution layout and API reference.
