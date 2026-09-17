@@ -15,7 +15,7 @@ Priority legend: **P0** = high value / interview-ready stretch · **P1** = stron
 | F3 | ~~Apply size limit on final export bytes~~ | **Done** | `ExportedSizeProbe`; packing and validation both measure the exported artifact |
 | F4 | Real **image-only scanned** sample PDF (embedded image, no text) | P1 | Current sample = empty text layer (same business rule) |
 | F5 | Content **hashing** across parts for stronger validation | P1 | Coverage is page-level today; hashing would catch sub-page loss |
-| F6 | More exporters (RTF/XML/JSON) behind `IOutputExporter` | P2 | UI already lists some as unsupported |
+| F6 | More exporters (RTF/XML/JSON) behind `IOutputExporter` | P2 | `OutputFormat` already names them; requesting one over the API is a **Failed** job, so the path is proven |
 | F7 | **Cache export measurements** while packing | P1 | Each candidate pack is a real export; fine at this size, wasteful for large DOCX |
 | F8 | **Per-page text density** for scanned detection | P1 | Today one stray character makes a scanned PDF look convertible |
 | F9 | Wider image passthrough (JPX/CMYK, not just PNG + JPEG) | P2 | Unsupported encodings currently surface as job warnings |
@@ -85,4 +85,4 @@ Priority legend: **P0** = high value / interview-ready stretch · **P1** = stron
 2. After submission: pick one vertical (e.g. async jobs + PDF export) and implement end-to-end.  
 3. When adding a feature, tick/move the row here or link a PR.
 
-*Last focused areas shipped:* export-aware splitting and validation (F3), page-level coverage validation, JPEG image passthrough with history warnings, HTML-first pipeline, DOCX via Open XML, Swagger at `/swagger`, multi-format UI options.
+*Last focused areas shipped:* export-aware splitting and validation (F3), page-level coverage validation, JPEG image passthrough with history warnings, images placed inline with the text they sit between, HTML-first pipeline, DOCX via Open XML, Swagger at `/swagger`.

@@ -20,7 +20,8 @@ What they prove:
 - Unsplittable section → exception  
 - Validator catches missing/duplicate/oversized parts  
 - Validator catches a **missing source page** even when the parts are internally consistent  
-- End-to-end pipeline: same PDF gives one plain-text part and several HTML parts at the same limit  
+- End-to-end pipeline: same PDF gives one DOCX part and several HTML parts at the same limit  
+- Images land between the text they sit between, not bunched after it  
 
 ---
 
@@ -45,17 +46,17 @@ npm start
 
 | # | Action | Expected |
 |---|--------|----------|
-| 1 | Upload `samples/text-with-images.pdf`, format HTML, limit 2 | **Completed**, 1 part, downloadable HTML |
-| 2 | Upload `samples/large-over-2mb.pdf`, limit **2** | **Completed** with **multiple parts** (`part N of M`) |
+| 1 | Upload `samples/text-with-images.pdf`, format HTML, limit 2 | **Completed**, 1 part, downloadable HTML with both images in place |
+| 2 | Upload `samples/large-over-2mb.pdf`, format HTML, limit **2** | **Completed** with **2 parts** (`part N of M`), each under 2 MB |
 | 3 | Upload `samples/scanned-no-text-sample.pdf` | **Failed**, error `SCANNED_DOCUMENT`, visible in history |
 | 4 | Upload a `.txt` renamed or non-PDF | **Failed** job persisted (`UNSUPPORTED_OR_CORRUPTED_INPUT`) |
 | 5 | Submit with output format `Rtf` (via API) | **Failed** job (`UNSUPPORTED_OUTPUT_FORMAT`) |
 | 6 | Click a past job in history | Detail shows timeline + downloads when completed |
-| 7 | Same large PDF at limit `2`, once as **HTML** and once as **DOCX** | The limit follows the delivered format, so part counts can differ |
+| 7 | Same large PDF at limit `2`, once as **HTML** and once as **DOCX** | The limit follows the delivered format: 2 HTML parts, 1 DOCX part (~40 KB) |
 
 ### Force splitting tip
 
-Upload `samples/large-over-2mb.pdf` with the default **2 MB** limit. The exported HTML is larger than 2 MB, so the job completes as sequenced parts.
+Upload `samples/large-over-2mb.pdf` as **HTML** with the default **2 MB** limit. The exported HTML is larger than 2 MB, so the job completes as sequenced parts. Pick DOCX instead and the same document fits in one part — that is the point of sizing on the export.
 
 ---
 

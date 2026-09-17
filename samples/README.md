@@ -2,7 +2,7 @@
 
 | File | Purpose |
 |------|---------|
-| `text-with-images.pdf` | Six-page assessment PDF with extractable text and an embedded image → should **Complete** as one part at the 2 MB limit |
+| `text-with-images.pdf` | One page of extractable text with two embedded images → should **Complete** as one part at the 2 MB limit, images kept in place |
 | `scanned-no-text-sample.pdf` | Page image with **no text layer** → should **Fail** as scanned (`SCANNED_DOCUMENT`) |
 | `large-over-2mb.pdf` | Text PDF larger than 2 MB → should **Complete** and **split** at the default 2 MB limit |
 

@@ -10,10 +10,10 @@ ChopDoc is a modular monolith: Angular submits a PDF job; a .NET API orchestrate
 One use case; interfaces already separate responsibilities. Microservice hop cost isn't justified yet. Evolution path is a background worker first.
 
 **Why HTML as an intermediate rather than converting straight to DOCX?**  
-Splitting and validation need something deterministic with markers. One conversion, one splitter, one validator, three exporters — adding a format is an `IOutputExporter`, not another pipeline.
+Splitting and validation need something deterministic with markers. One conversion, one splitter, one validator, two exporters — adding a format is an `IOutputExporter`, not another pipeline.
 
 **The limit is 2 MB — 2 MB of what?**  
-The file that gets handed off. The splitter takes an `ExportedSizeProbe` and measures each candidate part with a real export, so a document whose HTML is 3 MB but whose plain-text export is 300 KB stays one part. Export happens before validation, so validation checks the delivered bytes.
+The file that gets handed off. The splitter takes an `ExportedSizeProbe` and measures each candidate part with a real export, so `samples/large-over-2mb.pdf` needs two parts as HTML at a 2 MB limit but stays a single 40 KB part as DOCX. Export happens before validation, so validation checks the delivered bytes.
 
 **Then why not split the exported file directly?**  
 A DOCX is a zip; you cannot cut it in half. Boundaries come from HTML units, sizes come from the export.
@@ -30,6 +30,9 @@ Marker uniqueness alone only proves the parts are consistent with each other —
 **What happens to an image PdfPig cannot decode?**  
 PNG first, then JPEG raw-byte passthrough for DCTDecode. Anything left goes into the job history as a warning — visible, not silently dropped.
 
+**How do images end up in the right place?**  
+Layout blocks carry the vertical span of their lines, and each image is slotted in front of the first block starting at or below it — slotted into the existing block order, not sorted in by position, because the layout pass already handles two-column reading order.
+
 **Failed vs NeedsReview?**  
 Failed = cannot proceed under the rules. NeedsReview = processed but the output is not safe to accept. Completed requires validation to have passed.
 
@@ -42,5 +45,6 @@ Async worker, PDF exporter, content hashing below page level, cached export meas
 2. `PdfDocumentConverter` — conversion rules, page markers, image passthrough  
 3. `MarkedDocumentSplitter` — export-aware packing, atom expansion, unsplittable  
 4. `DocumentOutputValidator` — structure/coverage on the intermediate, size on the exported parts  
-5. `DocumentJob` — status, history, and warning ownership  
-6. `DocumentJobServiceTests` — proves the export-size rule end to end
+5. `HtmlOutputExporter` — HTML and DOCX from the same intermediate, images in document order  
+6. `DocumentJob` — status, history, and warning ownership  
+7. `DocumentJobServiceTests` — proves the export-size rule end to end

@@ -45,5 +45,5 @@ Mapped to DigiArenas *Senior Full Stack Technical Assessment*.
 
 Requirement 4.3 talks about the *converted output*, which is the file handed off — not the HTML it was derived from. Two things follow, and both are tested:
 
-1. `MarkedDocumentSplitter` takes an `ExportedSizeProbe` and measures every candidate part in the requested format. A document whose HTML exceeds 2 MB but whose plain-text export does not stays a single part.
+1. `MarkedDocumentSplitter` takes an `ExportedSizeProbe` and measures every candidate part in the requested format. A document whose HTML exceeds 2 MB but whose DOCX export does not stays a single part.
 2. `DocumentJobService` exports into memory *before* validating, so `ValidateExportedParts` checks the bytes that will actually be written, and a failure leaves nothing behind in storage.

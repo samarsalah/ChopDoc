@@ -90,7 +90,7 @@ dotnet test
 
 | File | Expected behaviour |
 |------|--------------------|
-| `samples/text-with-images.pdf` | Converts successfully (text plus an embedded image) |
+| `samples/text-with-images.pdf` | Converts successfully (one page of text plus two embedded images) |
 | `samples/scanned-no-text-sample.pdf` | Fails with `SCANNED_DOCUMENT` (image only, no text layer) |
 | `samples/large-over-2mb.pdf` | Larger than 2 MB; splits at the default 2 MB limit |
 
@@ -110,7 +110,7 @@ Queued → Converting → Splitting → Validating → Completed
                               ↘ Failed / NeedsReview
 ```
 
-1. **Convert (PdfPig):** extract text + embed images as-is into HTML page sections (`data-chopdoc-marker`). No OCR. No text layer → `ScannedDocumentException`. Images PdfPig cannot re-encode are recorded as a warning in the job history rather than dropped quietly.
+1. **Convert (PdfPig):** extract text + embed images as-is into HTML page sections (`data-chopdoc-marker`). Text blocks carry the vertical span of their lines, so each image is placed between the blocks it sits between on the page rather than after all of them. No OCR. No text layer → `ScannedDocumentException`. Images PdfPig cannot re-encode are recorded as a warning in the job history rather than dropped quietly.
 2. **Split:** every size decision is measured **in the requested output format**, not in the HTML intermediate — the limit applies to the file that gets handed off. If the exported output fits the limit → one part; otherwise page sections are packed into ordered parts (`part N of M`), each pack verified by a real export. An oversized page is broken into smaller HTML atoms first; a single atom over the limit → `UnsplittableContentException` → **NeedsReview**.
 3. **Export then validate:** parts are exported in memory before validation, so validation sees the delivered artifacts. Structure and completeness are checked on the intermediate (where markers live): sequence, no duplicates, and **every source page present in the output**. Size is checked on the exported parts. Failure → **NeedsReview** (never marked Completed), and nothing is written to storage.
 4. **Persist:** only after validation passes. Every status change and warning is stored in job history (SQLite).
